@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["PulseHealthkitModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.pulsehealthkit.PulseHealthkitModule"]
+  }
+}

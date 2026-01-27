@@ -1,0 +1,22 @@
+{
+  "name": "pulse",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@10.x",
+  "description": "Pulse - Application mobile de suivi de santé",
+  "engines": {
+    "node": ">=20.19.4"
+  },
+  "scripts": {
+    "start": "cd mobile && expo start",
+    "android": "cd mobile && expo start --android",
+    "ios": "cd mobile && expo start --ios",
+    "web": "cd mobile && expo start --web",
+    "doctor": "cd mobile && npx expo-doctor",
+    "deps:fix": "cd mobile && npx expo install --fix",
+    "deps:check": "cd mobile && ./scripts/check-deps.sh"
+  },
+  "workspaces": [
+    "mobile"
+  ]
+}

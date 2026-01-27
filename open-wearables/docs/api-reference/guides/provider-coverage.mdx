@@ -1,0 +1,343 @@
+---
+title: 'Provider Coverage Matrix'
+description: 'Which health data types are supported by each wearable provider'
+---
+
+This guide provides a comprehensive overview of data type support across all integrated wearable providers. Use this matrix to understand what data you can expect when integrating with specific devices.
+
+## Quick Overview
+
+| Capability | Apple | Garmin | Polar | Suunto | Whoop |
+|------------|:-----:|:------:|:-----:|:------:|:-----:|
+| **OAuth** | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Workouts** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Sleep** | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| **24/7 Data** | ✅ | 🔜 | ❌ | ✅ | ◐ |
+| **Timeseries** | ✅ | ◐ | ◐ | ✅ | ❌ |
+
+<Accordion title="Legend">
+  - ✅ **Full support** — Fully implemented and collecting data
+  - ◐ **Partial** — Limited data or only during certain contexts (e.g., workouts only)
+  - 🔜 **Coming soon** — Provider API supports this, processing not yet implemented
+  - ❌ **Not available** — Provider doesn't support this or not applicable
+</Accordion>
+
+<Note>
+  **Timeseries** = Granular, timestamped data points (heart rate samples, step counts, HRV readings) available via the `/timeseries` API endpoint.
+  
+  **24/7 Data** = Continuous health monitoring throughout the day (not just during workouts), including resting heart rate, HRV during sleep, SpO2 spot checks, and daily activity samples.
+</Note>
+
+---
+
+## Detailed Coverage Matrix
+
+### Heart & Cardiovascular
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `heart_rate` | bpm | ✅ | ◐/🔜 | ◐ | ✅ | ❌ |
+| `resting_heart_rate` | bpm | ✅ | 🔜 | ❌ | ❌ | 🔜 |
+| `heart_rate_variability_sdnn` | ms | ✅ | 🔜 | ◐ | ✅ | 🔜 |
+| `heart_rate_recovery_one_minute` | bpm | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `walking_heart_rate_average` | bpm | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+<Accordion title="Legend">
+  - ✅ **Full support** — Available as time series data
+  - ◐ **Partial** — Currently available only within workout/activity context
+  - ◐/🔜 **Partial + Coming** — Workout data implemented, continuous data coming soon
+  - 🔜 **Coming soon** — Provider API supports this, processing not yet implemented
+  - ❌ **Not available** — Provider does not offer this data type
+</Accordion>
+
+### Blood & Respiratory
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `oxygen_saturation` | % | ✅ | 🔜 | ❌ | ✅ | ❌ |
+| `blood_glucose` | mg/dL | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `blood_pressure_systolic` | mmHg | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `blood_pressure_diastolic` | mmHg | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `respiratory_rate` | brpm | ✅ | 🔜 | ❌ | ❌ | 🔜 |
+| `sleeping_breathing_disturbances` | count | ❌ | 🔜 | ❌ | ❌ | ❌ |
+
+### Body Composition
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `height` | cm | ✅ | 🔜 | 🔜 | ❌ | 🔜 |
+| `weight` | kg | ✅ | 🔜 | 🔜 | ❌ | 🔜 |
+| `body_fat_percentage` | % | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `body_mass_index` | kg/m² | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `lean_body_mass` | kg | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `body_temperature` | °C | ✅ | ❌ | ❌ | ❌ | 🔜 |
+
+### Fitness Metrics
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `vo2_max` | mL/kg/min | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `six_minute_walk_test_distance` | meters | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+### Activity - Basic
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `steps` | count | ✅ | ◐/🔜 | ❌ | ✅ | ❌ |
+| `energy` | kcal | ✅ | 🔜 | ◐ | ✅ | ❌ |
+| `basal_energy` | kcal | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `stand_time` | minutes | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `exercise_time` | minutes | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `physical_effort` | score | ❌ | 🔜 | ❌ | ❌ | 🔜 |
+| `flights_climbed` | count | ✅ | 🔜 | ❌ | ❌ | ❌ |
+
+### Activity - Distance
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `distance_walking_running` | meters | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `distance_cycling` | meters | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `distance_swimming` | meters | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `distance_downhill_snow_sports` | meters | ✅ | 🔜 | ◐ | ◐ | ❌ |
+
+### Activity - Walking Metrics
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `walking_step_length` | cm | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `walking_speed` | m/s | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `walking_double_support_percentage` | % | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `walking_asymmetry_percentage` | % | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `walking_steadiness` | % | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `stair_descent_speed` | m/s | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `stair_ascent_speed` | m/s | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+### Activity - Running Metrics
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `running_power` | watts | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `running_speed` | m/s | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `running_vertical_oscillation` | cm | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `running_ground_contact_time` | ms | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| `running_stride_length` | cm | ✅ | 🔜 | ❌ | ◐ | ❌ |
+
+### Activity - Other
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `swimming_stroke_count` | count | ✅ | 🔜 | ◐ | ◐ | ❌ |
+| `cadence` | rpm | ❌ | 🔜 | ◐ | ◐ | ❌ |
+| `power` | watts | ❌ | 🔜 | ◐ | ◐ | ❌ |
+
+### Environmental
+
+| Data Type | Unit | Apple | Garmin | Polar | Suunto | Whoop |
+|-----------|------|:-----:|:------:|:-----:|:------:|:-----:|
+| `environmental_audio_exposure` | dB | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `headphone_audio_exposure` | dB | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## Sleep Data Coverage
+
+Sleep tracking varies significantly across providers. Here's what each provider offers:
+
+| Feature | Apple | Garmin | Polar | Suunto | Whoop |
+|---------|:-----:|:------:|:-----:|:------:|:-----:|
+| Sleep sessions | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| Total duration | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| Time in bed | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| Sleep efficiency | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| **Sleep Stages** | | | | | |
+| Deep sleep | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| Light sleep | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| REM sleep | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| Awake time | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+| **Biometrics During Sleep** | | | | | |
+| Average heart rate | 🔜 | 🔜 | ❌ | ✅ | ❌ |
+| Min heart rate | 🔜 | 🔜 | ❌ | ✅ | ❌ |
+| Average HRV | 🔜 | 🔜 | ❌ | ✅ | ❌ |
+| SpO2 | 🔜 | 🔜 | ❌ | ✅ | ❌ |
+| Nap detection | 🔜 | 🔜 | ❌ | ✅ | ✅ |
+
+<Info>
+  🔜 = Data available from provider API/SDK but processing not yet implemented in Open Wearables.
+</Info>
+
+---
+
+## Workout Data Coverage
+
+All providers that support workouts provide these common fields:
+
+| Feature | Apple | Garmin | Polar | Suunto | Whoop |
+|---------|:-----:|:------:|:-----:|:------:|:-----:|
+| Workout sessions | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Duration | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Start/end time | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Workout type | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Device name | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Heart Rate** | | | | | |
+| Avg heart rate | ◐ | ✅ | ✅ | ✅ | ✅ |
+| Max heart rate | ◐ | ✅ | ✅ | ✅ | ✅ |
+| Min heart rate | ◐ | 🔜 | ❌ | ✅ | ❌ |
+| **Activity Metrics** | | | | | |
+| Calories burned | ◐ | ✅ | ✅ | ✅ | ✅ |
+| Distance | ◐ | ✅ | ✅ | ✅ | ✅ |
+| Steps | ◐ | ✅ | ❌ | ✅ | ❌ |
+| Moving time | 🔜 | 🔜 | 🔜 | ✅ | ✅ |
+| **Speed & Power** | | | | | |
+| Average speed | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| Max speed | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| Average watts | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| Max watts | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| **Elevation** | | | | | |
+| Total elevation gain | 🔜 | 🔜 | 🔜 | ✅ | ✅ |
+| Elevation high | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| Elevation low | 🔜 | 🔜 | 🔜 | ✅ | ❌ |
+| **Other** | | | | | |
+| GPS route | ❌ | 🔜 | 🔜 | 🔜 | ❌ |
+
+<Accordion title="Apple Workout Data Note">
+  Apple workout fields marked ◐ depend on import method:
+  - **Auto Health Export**: Heart rate ✅, other metrics 🔜
+  - **Healthion/HealthKit**: Calories ✅, distance ✅, steps ✅, heart rate 🔜
+</Accordion>
+
+<Note>
+  Workout types are normalized to a unified taxonomy. See [Data Types](/api-reference/guides/data-types#workout-types) for the full list of supported workout types.
+</Note>
+
+---
+
+## Provider Quirks
+
+Key differences and limitations to be aware of when working with each provider:
+
+<Accordion title="Apple Health">
+  **Integration Method:** Push-based via SDK (no OAuth)
+  
+  - Data arrives via client SDK push, not server-to-server sync
+  - Multiple import methods with different data availability:
+    - **Auto Health Export app**: Best for heart rate time series
+    - **Healthion SDK**: Best for workout summaries (calories, distance, steps)
+  - Most comprehensive data coverage (35+ metric types)
+  - Some walking metrics require iPhone in pocket during activity
+  - HRV is measured as SDNN, typically during sleep or rest periods
+</Accordion>
+
+<Accordion title="Garmin">
+  **Integration Method:** OAuth 2.0 + Webhooks
+  
+  - Webhooks push data for activities, sleep, dailies, and epochs
+  - Sleep and daily summaries received via webhook but processing not yet implemented
+  - 135+ workout type mappings to unified taxonomy
+  - Distance and calories extracted from workout data
+</Accordion>
+
+<Accordion title="Polar">
+  **Integration Method:** OAuth 2.0 (pull-based)
+  
+  - No webhooks or 24/7 continuous data — workouts only
+  - "Sleep" in API is activity zone detection (lying down), **not** sleep stage analysis
+  - RR interval (HRV) data requires Polar H6, H7, H9, or H10 chest strap sensors
+  - Calories and distance extracted from exercise data
+  - 75+ workout type mappings to unified taxonomy
+</Accordion>
+
+<Accordion title="Suunto">
+  **Integration Method:** OAuth 2.0 + 24/7 Data API
+  
+  - Most complete cloud-based provider (workouts + sleep + continuous data)
+  - Full sleep analysis with stages and biometrics (HR, HRV, SpO2)
+  - Activity samples include heart rate, steps, SpO2, energy, and HRV
+  - 121+ workout type mappings to unified taxonomy
+  - Recovery scores and readiness data available
+</Accordion>
+
+<Accordion title="Whoop">
+  **Integration Method:** OAuth 2.0
+  
+  - Full workout support with 80+ workout type mappings to unified taxonomy
+  - Workout metrics include: avg/max heart rate, calories, distance, elevation gain, moving time
+  - Continuous heart rate data is **not available** via API (only during workouts)
+  - Does not track steps (device limitation)
+  - Sleep data fully implemented with all stages and efficiency
+  - Recovery data (HRV, resting HR, recovery score) available but not yet implemented
+  - Strain scores available but not yet implemented
+</Accordion>
+
+---
+
+## Data Normalization
+
+Open Wearables normalizes all incoming data to consistent units and formats:
+
+### Unit Standardization
+
+All data is normalized to these canonical units:
+
+| Metric | Unit |
+|--------|------|
+| Heart rate | `bpm` |
+| HRV | `ms` |
+| Distance | `meters` |
+| Weight | `kg` |
+| Height | `cm` |
+| Temperature | `°C` |
+| Energy | `kcal` |
+| Duration | `seconds` |
+| Speed | `m/s` |
+| Blood glucose | `mg/dL` |
+
+### Timestamp Handling
+
+All timestamps are normalized to **UTC** with timezone information preserved when available:
+
+```json
+{
+  "timestamp": "2025-01-07T14:30:00Z",
+  "type": "heart_rate",
+  "value": 72,
+  "unit": "bpm"
+}
+```
+
+---
+
+## Checking User Data Availability
+
+To see what data is available for a specific user, query the connections endpoint:
+
+```bash
+curl -X GET "https://api.openwearables.com/api/v1/users/{user_id}/connections" \
+  -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
+```
+
+Response shows which providers are connected:
+
+```json
+[
+  {
+    "provider": "suunto",
+    "status": "active",
+    "last_synced_at": "2025-01-07T10:30:00Z"
+  },
+  {
+    "provider": "apple",
+    "status": "active",
+    "last_synced_at": "2025-01-07T14:22:00Z"
+  }
+]
+```
+
+Then query the timeseries endpoint to see available data:
+
+```bash
+curl -X GET "https://api.openwearables.com/api/v1/users/{user_id}/timeseries\
+?start_time=2025-01-01T00:00:00Z\
+&end_time=2025-01-07T23:59:59Z" \
+  -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
+```
+

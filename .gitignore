@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+
+# iOS
+ios/Pods/
+ios/build/
+*.xcworkspace
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserstate
+*.xcuserdatad
+
+# Android
+android/app/build/
+android/.gradle/
+*.apk
+*.aab
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+config.example.env
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+
+# Metro
+.metro/
+.babel-cache/
+node_modules/.cache/
+
+# Temporary files
+*.orig.*
+*.tmp
