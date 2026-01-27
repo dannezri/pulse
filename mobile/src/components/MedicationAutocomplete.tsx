@@ -108,8 +108,7 @@ export function MedicationAutocomplete({
           <FlatList
             data={suggestions}
             keyExtractor={(item) => item.id}
-            scrollEnabled={true}
-            nestedScrollEnabled={true}
+            scrollEnabled={false}
             keyboardShouldPersistTaps="handled"
             style={styles.suggestionsList}
             renderItem={({ item }) => (

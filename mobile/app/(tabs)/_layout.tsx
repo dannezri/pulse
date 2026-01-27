@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, History, User, Pill, Link } from "lucide-react-native";
+import { Home, History, User, Pill, Link, Activity } from "lucide-react-native";
 
 export default function TabsLayout() {
   // Note: Authentication is handled by app/index.tsx and useAuth hook
@@ -25,8 +25,17 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Aujourd'hui",
+          title: "Pulse",
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          // Style minimaliste pour l'écran principal (immersif)
+          tabBarStyle: {
+            backgroundColor: "#000000",
+            borderTopColor: "transparent",
+            borderTopWidth: 0,
+            position: "absolute",
+            elevation: 0,
+            shadowOpacity: 0,
+          },
         }}
       />
       <Tabs.Screen
@@ -41,6 +50,13 @@ export default function TabsLayout() {
         options={{
           title: "Médicaments",
           tabBarIcon: ({ color, size }) => <Pill size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="requests"
+        options={{
+          title: "Webhooks",
+          tabBarIcon: ({ color, size }) => <Activity size={size} color={color} />,
         }}
       />
       <Tabs.Screen

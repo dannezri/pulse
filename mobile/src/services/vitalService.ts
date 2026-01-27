@@ -149,7 +149,7 @@ class VitalService {
    */
   async getConnections(): Promise<VitalConnection> {
     try {
-      console.log('[VitalService] Fetching connections...');
+      // console.log('[VitalService] Fetching connections...');
       const response = await this.apiCall<VitalConnection>(
         '/api/vital/connections',
         {
@@ -161,7 +161,13 @@ class VitalService {
         `[VitalService] Retrieved ${response.providers.length} connections`
       );
       return response;
-    } catch (error) {
+    } catch (error: any) {
+      // Vital n'est pas encore implémenté côté backend
+      // Retourner un objet vide au lieu de crasher
+      if (error?.message?.includes('Not Found') || error?.message?.includes('404')) {
+        // console.log('[VitalService] Vital API not yet implemented');
+        throw new Error('Vital API not implemented');
+      }
       console.error('[VitalService] Error fetching connections:', error);
       throw error;
     }
@@ -216,7 +222,10 @@ class VitalService {
       await this.getConnections();
       return true;
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (error.message?.includes('Vital API not implemented') || 
+          error.message?.includes('404') || 
+          error.message?.includes('not found') || 
+          error.message?.includes('Not Found')) {
         return false;
       }
       // Autre erreur (network, etc.) - on considère que le compte n'existe pas

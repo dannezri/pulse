@@ -49,11 +49,19 @@ export function useVital(): UseVitalReturn {
       } else {
         setConnections([]);
       }
-    } catch (err) {
-      console.error('[useVital] Error checking Vital status:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setIsVitalConfigured(false);
-      setConnections([]);
+    } catch (err: any) {
+      // Si Vital n'est pas implémenté, ne pas logger comme une erreur
+      if (err?.message?.includes('Vital API not implemented')) {
+        // console.log('[useVital] Vital API not yet available');
+        setIsVitalConfigured(false);
+        setConnections([]);
+        setError(null); // Pas d'erreur visible pour l'utilisateur
+      } else {
+        console.error('[useVital] Error checking Vital status:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setIsVitalConfigured(false);
+        setConnections([]);
+      }
     } finally {
       setIsLoading(false);
     }

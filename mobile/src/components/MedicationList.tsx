@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, FlatList, Alert, StyleSheet } from 'react-native';
+import { View, Text, Alert, StyleSheet } from 'react-native';
 import { Medication } from '../hooks/useMedications';
 import { PressableScale } from './PressableScale';
 import { Pill, Trash2, Clock } from 'lucide-react-native';
@@ -73,12 +73,9 @@ export function MedicationList({
   }
 
   return (
-    <FlatList
-      data={medications}
-      keyExtractor={(item) => item.id}
-      scrollEnabled={false}
-      renderItem={({ item }) => (
-        <View style={styles.card}>
+    <View>
+      {medications.map((item) => (
+        <View key={item.id} style={styles.card}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.iconContainer}>
@@ -126,8 +123,8 @@ export function MedicationList({
             </Text>
           </View>
         </View>
-      )}
-    />
+      ))}
+    </View>
   );
 }
 

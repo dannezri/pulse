@@ -22,6 +22,8 @@ from vital_webhook import VitalWebhookHandler
 from vital_webhook_v2 import VitalWebhookHandlerV2
 from jwt_auth import verify_jwt_or_uuid_token
 from vital_client import get_vital_client
+from webhook_logger import WebhookLogger, get_user_webhook_logs, get_all_webhook_logs
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,6 +58,9 @@ except Exception as e:
 # Vital Webhook Handlers (V1 et V2)
 vital_handler = VitalWebhookHandler(supabase_client)  # Ancien format (rétrocompatibilité)
 vital_handler_v2 = VitalWebhookHandlerV2(supabase_client, vital_client)  # Format officiel Vital
+
+# Webhook Logger
+webhook_logger = WebhookLogger(supabase_client)
 
 
 @app.get("/")
@@ -137,8 +142,26 @@ async def vital_webhook(request: Request):
         - 400: Payload invalide
         - 500: Erreur serveur
     """
+    start_time = datetime.utcnow()
+    log_id = None
+    
     try:
         payload = await request.json()
+        
+        # Logger le webhook reçu
+        event_type = payload.get("event_type")
+        user_id = payload.get("user_id")
+        client_user_id = payload.get("client_user_id")
+        
+        log_id = webhook_logger.log_webhook(
+            endpoint="/api/webhooks/vital",
+            payload=payload,
+            event_type=event_type,
+            user_id=user_id,
+            client_user_id=client_user_id,
+            method="POST",
+            start_time=start_time
+        )
         
         # Détecter le format du webhook
         if "event_type" in payload and "client_user_id" in payload:
@@ -150,18 +173,61 @@ async def vital_webhook(request: Request):
             logger.info("Processing Vital webhook V1 (legacy format)")
             result = vital_handler.process_webhook(payload)
         
+        # Calculer la durée
+        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        
+        # Mettre à jour le log
         if result["status"] == "error":
+            webhook_logger.update_webhook_log(
+                log_id=log_id,
+                status_code=400,
+                response_message=result["message"],
+                error=result["message"],
+                duration_ms=duration_ms
+            )
             raise HTTPException(status_code=400, detail=result["message"])
         elif result["status"] == "accepted":
+            webhook_logger.update_webhook_log(
+                log_id=log_id,
+                status_code=202,
+                response_message=result["message"],
+                duration_ms=duration_ms
+            )
             # 202 Accepted: webhook accepté mais utilisateur non trouvé
             return {"status": "accepted", "message": result["message"]}
         
+        # Succès
+        webhook_logger.update_webhook_log(
+            log_id=log_id,
+            status_code=200,
+            response_message=result["message"],
+            duration_ms=duration_ms
+        )
+        
         return {"status": "success", "message": result["message"]}
         
-    except HTTPException:
+    except HTTPException as http_exc:
+        # Mettre à jour le log si erreur HTTP
+        if log_id:
+            duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            webhook_logger.update_webhook_log(
+                log_id=log_id,
+                status_code=http_exc.status_code,
+                error=http_exc.detail,
+                duration_ms=duration_ms
+            )
         raise
     except Exception as e:
         logger.error(f"Vital webhook error: {e}")
+        # Mettre à jour le log si erreur générique
+        if log_id:
+            duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            webhook_logger.update_webhook_log(
+                log_id=log_id,
+                status_code=500,
+                error=str(e),
+                duration_ms=duration_ms
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -577,6 +643,75 @@ async def connect_demo_provider(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/webhooks/logs")
+async def get_webhook_logs(
+    user_id: str,
+    limit: int = 50
+):
+    """
+    Récupère les logs de webhooks
+    
+    Query params:
+        - user_id: UUID utilisateur (required)
+        - limit: Nombre maximum de logs (default: 50)
+    
+    Returns:
+        Liste des webhooks reçus avec détails
+    """
+    try:
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"Fetching webhook logs for user {user_id}")
+        
+        # Récupérer les logs
+        logs = get_user_webhook_logs(supabase_client, user_id, limit)
+        
+        return {
+            "status": "success",
+            "count": len(logs),
+            "logs": logs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching webhook logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/webhooks/logs/all")
+async def get_all_webhooks_logs(
+    limit: int = 100
+):
+    """
+    Récupère tous les logs de webhooks (admin only)
+    
+    Query params:
+        - limit: Nombre maximum de logs (default: 100)
+    
+    Returns:
+        Liste de tous les webhooks reçus
+        
+    Note: Cet endpoint devrait être protégé par une authentification admin en production
+    """
+    try:
+        logger.info(f"Fetching all webhook logs (limit: {limit})")
+        
+        # Récupérer tous les logs
+        logs = get_all_webhook_logs(supabase_client, limit)
+        
+        return {
+            "status": "success",
+            "count": len(logs),
+            "logs": logs
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching all webhook logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     
@@ -584,6 +719,7 @@ if __name__ == "__main__":
     
     print(f"🚀 Démarrage du serveur Pulse MVP v2.0 sur http://0.0.0.0:{port}")
     print(f"📡 Endpoint webhook Vital: http://localhost:{port}/api/webhooks/vital")
+    print(f"📡 Endpoint webhook logs: http://localhost:{port}/api/webhooks/logs")
     print(f"📡 Endpoint cron insight: http://localhost:{port}/api/cron/daily-insight")
     print(f"📡 Endpoint insights latest: http://localhost:{port}/api/insights/latest")
     print(f"📡 Vital endpoints:")

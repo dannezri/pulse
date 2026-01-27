@@ -5,17 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Dimensions,
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { LineChart } from 'react-native-gifted-charts';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useMetricsHistory } from '../../src/hooks/useMetricsHistory';
 import { useQueryClient } from '@tanstack/react-query';
 import { TrendingUp, TrendingDown, Minus, Activity, Heart, Moon, Footprints, Flame, Route, Wind, Droplets, Scale, Brain, Coffee, Apple, TrendingUpIcon } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
+import { LifeLineChart } from '../../src/components/LifeLineChart';
 
 type MetricType = 
   | 'steps' | 'distance' | 'calories' | 'active_calories' | 'floors_climbed' | 'vo2_max'
@@ -39,8 +36,8 @@ const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: 'steps',
     title: 'Pas',
-    icon: <Footprints size={18} color="#FF2D55" />,
-    color: '#FF2D55',
+    icon: <Footprints size={18} color="#00FF41" />,
+    color: '#00FF41',
     unit: 'pas',
     formatter: (v) => Math.round(v).toLocaleString('fr-FR'),
   },
@@ -89,8 +86,8 @@ const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: 'hrv',
     title: 'HRV',
-    icon: <Activity size={18} color="#34C759" />,
-    color: '#34C759',
+    icon: <Activity size={18} color="#00FF41" />,
+    color: '#00FF41',
     unit: 'ms',
     formatter: (v) => Math.round(v).toString(),
   },
@@ -242,7 +239,15 @@ export default function TendancesScreen() {
       return { average: 0, min: 0, max: 0, trend: 'stable' as const };
     }
 
-    const values = data.map((d) => d.value);
+    // Filtrer les valeurs invalides
+    const values = data
+      .map((d) => d?.value)
+      .filter((v) => v != null && typeof v === 'number' && !isNaN(v) && isFinite(v));
+    
+    if (values.length === 0) {
+      return { average: 0, min: 0, max: 0, trend: 'stable' as const };
+    }
+
     const average = values.reduce((a, b) => a + b, 0) / values.length;
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -252,11 +257,11 @@ export default function TendancesScreen() {
     const firstHalf = values.slice(0, midPoint);
     const secondHalf = values.slice(midPoint);
 
-    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+    const firstAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0;
+    const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
 
     const diff = secondAvg - firstAvg;
-    const trend = diff > firstAvg * 0.05 ? 'up' : diff < -firstAvg * 0.05 ? 'down' : 'stable';
+    const trend = firstAvg > 0 && (diff > firstAvg * 0.05 ? 'up' : diff < -firstAvg * 0.05 ? 'down' : 'stable') || 'stable';
 
     return { average, min, max, trend };
   };
@@ -269,18 +274,9 @@ export default function TendancesScreen() {
       return null;
     }
 
-    // Prepare chart data
-    const chartData = data.map((point, index) => ({
-      value: point.value,
-      label: index % Math.max(1, Math.floor(data.length / 7)) === 0
-        ? new Date(point.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-        : '',
-      dataPointText: '',
-    }));
-
     const TrendIcon =
       stats.trend === 'up' ? TrendingUp : stats.trend === 'down' ? TrendingDown : Minus;
-    const trendColor = stats.trend === 'up' ? '#34C759' : stats.trend === 'down' ? '#FF3B30' : '#8E8E93';
+    const trendColor = stats.trend === 'up' ? '#00FF41' : stats.trend === 'down' ? '#FF3B30' : '#8E8E93';
 
     return (
       <View key={config.key} style={styles.metricCard}>
@@ -310,29 +306,12 @@ export default function TendancesScreen() {
         </View>
 
         <View style={styles.chartContainer}>
-          <LineChart
-            data={chartData}
-            width={width - 80}
-            height={120}
+          <LifeLineChart
+            data={data}
+            baseline={stats.average}
             color={config.color}
-            thickness={2}
-            startFillColor={config.color}
-            endFillColor={config.color}
-            startOpacity={0.3}
-            endOpacity={0.05}
-            areaChart
-            hideDataPoints={data.length > 20}
-            spacing={Math.max(20, (width - 100) / data.length)}
-            initialSpacing={10}
-            endSpacing={10}
-            noOfSections={3}
-            yAxisColor="#2C2C2E"
-            xAxisColor="#2C2C2E"
-            yAxisTextStyle={{ color: '#8E8E93', fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: '#8E8E93', fontSize: 10, width: 50, textAlign: 'center' }}
-            hideRules
-            curved
-            animateOnDataChange
+            title={config.title}
+            unit={config.unit}
           />
         </View>
 

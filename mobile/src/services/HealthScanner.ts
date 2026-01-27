@@ -25,7 +25,7 @@ function isSimulator(): boolean {
  */
 async function loadManualMedications(fromISO: string, toISO: string): Promise<Medication[]> {
   try {
-    const STORAGE_KEY = '@pulse_medications';
+    const STORAGE_KEY = 'pulse_medications';
     const stored = await SecureStore.getItemAsync(STORAGE_KEY);
     
     if (!stored) {

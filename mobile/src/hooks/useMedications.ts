@@ -17,7 +17,7 @@ export interface Medication {
   createdAt: string;
 }
 
-const STORAGE_KEY = '@pulse_medications';
+const STORAGE_KEY = 'pulse_medications';
 
 export function useMedications() {
   const [medications, setMedications] = useState<Medication[]>([]);

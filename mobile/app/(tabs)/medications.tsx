@@ -9,12 +9,12 @@ import {
   Text, 
   TouchableOpacity, 
   Modal, 
-  SafeAreaView, 
   ActivityIndicator, 
   Alert,
   ScrollView,
   StyleSheet 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMedications } from '../../src/hooks/useMedications';
 import { MedicationForm } from '../../src/components/MedicationForm';
 import { MedicationList } from '../../src/components/MedicationList';

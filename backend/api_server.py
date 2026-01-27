@@ -19,6 +19,7 @@ from webhook_receiver import WebhookReceiver
 from main import DataPipeline
 from correlation_engine import CorrelationEngine
 from llm_client import LLMClient
+from priority_engine import PriorityEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,6 +58,9 @@ correlation_engine = CorrelationEngine(
     supabase_client=supabase_client,
     llm_client=llm_client
 )
+
+# Priority Engine pour l'interface Ambient Concierge
+priority_engine = PriorityEngine(supabase_client=supabase_client)
 
 
 @app.get("/")
@@ -297,6 +301,160 @@ async def get_latest_insight(
         raise
     except Exception as e:
         logger.error(f"Error fetching latest insight: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/baselines/{user_id}")
+async def get_user_baselines(user_id: str):
+    """
+    Retourne les baselines (μ, σ, poids) pour chaque métrique de l'utilisateur
+    Utilisé par le mobile pour calculer les Z-Scores en temps réel
+    
+    Calcule sur les 14 derniers jours par défaut
+    """
+    try:
+        logger.info(f"Fetching baselines for user {user_id}")
+        
+        baselines = priority_engine.calculate_baselines(user_id)
+        
+        if not baselines:
+            # Retourner 200 avec objet vide si pas de données (pas d'erreur)
+            return {
+                "status": "success",
+                "user_id": user_id,
+                "baselines": {},
+                "message": "No data available to calculate baselines"
+            }
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "baselines": baselines,
+            "lookback_days": 14
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching baselines for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/insights/prioritized")
+async def generate_prioritized_insight(request: Request):
+    """
+    Génère un insight "Concierge" ultra-court basé sur les top 3 anomalies
+    
+    Body attendu:
+    {
+        "user_id": "uuid",
+        "anomalies": [
+            {"metric": "hrv", "value": 45.2, "z_score": -2.35, "weight": 3, ...},
+            ...
+        ]
+    }
+    
+    Retourne un insight style "Concierge" : cause probable + action immédiate
+    """
+    try:
+        payload = await request.json()
+        user_id = payload.get("user_id")
+        anomalies = payload.get("anomalies", [])
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"Generating prioritized insight for user {user_id} with {len(anomalies)} anomalies")
+        
+        # Si aucune anomalie, retourner un insight "calm"
+        if not anomalies or len(anomalies) == 0:
+            return {
+                "status": "success",
+                "insight": {
+                    "content": "Votre corps est en parfaite homéostasie. Profitez de ce pic d'énergie.",
+                    "state": "calm",
+                    "priority": 1
+                }
+            }
+        
+        # Prendre les top 3 anomalies
+        top_anomalies = anomalies[:3]
+        
+        # Construire le prompt pour le LLM
+        anomalies_text = []
+        for anomaly in top_anomalies:
+            metric = anomaly.get("metric", "unknown")
+            value = anomaly.get("value", 0)
+            z_score = anomaly.get("z_score", 0)
+            direction = anomaly.get("direction", "")
+            baseline_mean = anomaly.get("baseline", {}).get("mean", 0)
+            
+            anomalies_text.append(
+                f"- {metric}: {value} (baseline: {baseline_mean}, écart: {z_score:.1f}σ {direction})"
+            )
+        
+        prompt = f"""Voici les 3 seules anomalies physiologiques détectées aujourd'hui :
+
+{chr(10).join(anomalies_text)}
+
+Ignore tout le reste. Rédige un conseil de concierge discret en français (max 150 caractères) qui :
+1. Explique la cause la plus probable de ces anomalies
+2. Donne UNE action immédiate et concrète
+
+Style : Direct, bienveillant, actionnable. Pas de jargon médical."""
+        
+        # Appeler le LLM
+        system_prompt = """Tu es un concierge de santé expert et discret. 
+Tu communiques de manière ultra-concise, bienveillante et actionnable.
+Tu n'expliques que l'essentiel et tu donnes des actions immédiates."""
+        
+        llm_response = llm_client.generate_insight(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        content = llm_response.get("content", "")
+        
+        # Déterminer la priorité et l'état selon les Z-Scores
+        max_z = max([abs(a.get("z_score", 0)) for a in top_anomalies])
+        max_weight = max([a.get("weight", 1) for a in top_anomalies])
+        
+        if max_z >= 3 and max_weight >= 3:
+            state = "alert"
+            priority = 2
+        elif max_z >= 2.5 or max_weight >= 2:
+            state = "warning"
+            priority = 1
+        else:
+            state = "calm"
+            priority = 1
+        
+        # Sauvegarder l'insight dans la base
+        supabase_client.client.table("insights").insert({
+            "user_id": user_id,
+            "content": content,
+            "instruction_text": content,  # Compatibilité
+            "category": "concierge",
+            "priority": priority,
+            "correlation_type": "z_score_anomaly"
+        }).execute()
+        
+        logger.info(f"Generated prioritized insight for user {user_id}: {content[:50]}...")
+        
+        return {
+            "status": "success",
+            "insight": {
+                "content": content,
+                "state": state,
+                "priority": priority,
+                "anomalies_count": len(top_anomalies)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating prioritized insight: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
