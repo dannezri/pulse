@@ -87,7 +87,7 @@ export function useMainInsight(
 ) {
   // Créer une clé stable pour les anomalies (pour éviter les re-renders inutiles)
   const anomaliesKey = anomalies
-    .map(a => `${a.metric}:${a.z_score.toFixed(1)}`)
+    .map(a => `${a.metric}:${a.z_score_robust.toFixed(1)}`)
     .join(',');
 
   return useQuery({

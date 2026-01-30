@@ -165,3 +165,71 @@ export function useRobustBaselinesMultiple(
   
   return result;
 }
+
+/**
+ * Helper pour vérifier si les baselines sont valides
+ * 
+ * Critères:
+ * - Baselines existent
+ * - Au moins une baseline avec sample_count >= 10
+ * - Au moins une baseline avec confidence !== 'low'
+ */
+export function hasValidBaselines(baselines: RobustBaselines | undefined): boolean {
+  if (!baselines || Object.keys(baselines).length === 0) {
+    return false;
+  }
+  
+  // Au moins une baseline avec données suffisantes
+  return Object.values(baselines).some(
+    baseline => baseline.sample_count >= 10 && baseline.confidence !== 'low'
+  );
+}
+
+/**
+ * Helper pour obtenir le statut des baselines
+ */
+export function getBaselinesStatus(baselines: RobustBaselines | undefined): {
+  status: 'none' | 'insufficient' | 'partial' | 'complete';
+  message: string;
+  validCount: number;
+  totalCount: number;
+} {
+  if (!baselines || Object.keys(baselines).length === 0) {
+    return {
+      status: 'none',
+      message: 'Collecte de données en cours... Revenez dans quelques jours.',
+      validCount: 0,
+      totalCount: 0
+    };
+  }
+  
+  const totalCount = Object.keys(baselines).length;
+  const validCount = Object.values(baselines).filter(
+    b => b.sample_count >= 10 && b.confidence !== 'low'
+  ).length;
+  
+  if (validCount === 0) {
+    return {
+      status: 'insufficient',
+      message: 'Données insuffisantes. Minimum 10 jours requis pour chaque métrique.',
+      validCount,
+      totalCount
+    };
+  }
+  
+  if (validCount < totalCount / 2) {
+    return {
+      status: 'partial',
+      message: `${validCount}/${totalCount} baselines disponibles. Collecte en cours...`,
+      validCount,
+      totalCount
+    };
+  }
+  
+  return {
+    status: 'complete',
+    message: `${validCount} baselines complètes`,
+    validCount,
+    totalCount
+  };
+}
