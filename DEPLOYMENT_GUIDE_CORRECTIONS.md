@@ -617,6 +617,232 @@ curl -X POST http://localhost:8000/api/baselines/calculate \
 # 5. Ajouter une photo (optionnel)
 ```
 
+### 5.4 Smoke Tests Post-Migration
+
+#### Objectif
+Vérifier que les endpoints critiques (Dashboard/Brief) ne crashent pas avec:
+- Baselines en version `baseline_v2_robust_migrated` (approximation)
+- Baselines manquantes (nouveau user)
+- Baselines partielles (< 10 jours de données)
+
+#### Scénario 1: User avec Baselines Migrées
+
+```bash
+# Via cURL ou Postman
+curl -X GET "http://localhost:8000/api/ambient/dashboard" \
+  -H "Authorization: Bearer USER-TOKEN-WITH-MIGRATED-BASELINES" \
+  -H "Content-Type: application/json"
+
+# Résultat attendu:
+# - HTTP 200 OK
+# - JSON valide
+# - Champ "anomalies" présent (peut être vide)
+# - Pas d'erreur "KeyError" ou "NoneType"
+# - Log backend: "Using baseline_v2_robust_migrated" (acceptable temporairement)
+```
+
+**Validation:**
+```bash
+# Vérifier logs backend
+tail -f backend/logs/app.log | grep -i "baseline\|anomaly"
+
+# Attendu: Aucune erreur, warnings possibles sur version migrée
+```
+
+#### Scénario 2: Nouveau User (0 Baselines)
+
+```bash
+# Créer un nouveau user de test
+curl -X POST "http://localhost:8000/api/auth/signup" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test-new-user@pulse.com","password":"testpass123"}'
+
+# Récupérer token
+NEW_USER_TOKEN="..."
+
+# Appeler dashboard
+curl -X GET "http://localhost:8000/api/ambient/dashboard" \
+  -H "Authorization: Bearer $NEW_USER_TOKEN" \
+  -H "Content-Type: application/json"
+
+# Résultat attendu:
+# - HTTP 200 OK
+# - anomalies: []
+# - state: "calm"
+# - message: "Collecte de données en cours..." (ou similaire)
+# - PAS DE CRASH
+```
+
+**Mobile Smoke Test:**
+```bash
+# En mobile (simulateur/device)
+# 1. Login avec nouveau user
+# 2. Ouvrir Dashboard
+# 3. Vérifier:
+#    - Pas de crash app
+#    - Orb affiche état "calm" (gris)
+#    - Message: "Collecte de données en cours..."
+#    - Aucune anomalie affichée
+```
+
+#### Scénario 3: User avec Données Partielles (<10 jours)
+
+```bash
+# Via backend: Seed 5 jours de données pour test user
+python backend/tests/seed_baseline_data.py --user-id TEST-USER-ID --days 5
+
+# Appeler dashboard
+curl -X GET "http://localhost:8000/api/ambient/dashboard" \
+  -H "Authorization: Bearer TEST-USER-TOKEN" \
+  -H "Content-Type: application/json"
+
+# Résultat attendu:
+# - HTTP 200 OK
+# - anomalies: [] OU anomalies présentes mais confidence "low"
+# - message: "Données insuffisantes pour certaines métriques"
+# - PAS DE CRASH
+```
+
+#### Scénario 4: Endpoint Brief avec Baselines Manquantes
+
+```bash
+# Appeler endpoint brief
+curl -X GET "http://localhost:8000/api/brief/today" \
+  -H "Authorization: Bearer NEW-USER-TOKEN" \
+  -H "Content-Type: application/json"
+
+# Résultat attendu:
+# - HTTP 200 OK OU 204 No Content
+# - brief: null OU brief avec message "En attente de données..."
+# - PAS D'ERREUR 500
+```
+
+#### Scénario 5: RPC get_user_baselines_robust
+
+```sql
+-- Tester RPC avec user qui n'a PAS de baselines
+SELECT * FROM get_user_baselines_robust(
+    'user-id-without-baselines',
+    'baseline_v2_robust'
+);
+
+-- Résultat attendu:
+-- 0 rows (table vide, pas d'erreur)
+
+-- Tester RPC avec user qui a baselines migrées
+SELECT * FROM get_user_baselines_robust(
+    'user-id-with-migrated-baselines',
+    'baseline_v2_robust_migrated'  -- Version migrée
+);
+
+-- Résultat attendu:
+-- N rows avec median, iqr, p25, p75 (valeurs approximatives mais valides)
+```
+
+#### Checklist Smoke Tests
+
+**Backend:**
+- [ ] Dashboard endpoint avec baselines migrées → 200 OK
+- [ ] Dashboard endpoint avec 0 baselines → 200 OK (anomalies vides)
+- [ ] Dashboard endpoint avec <10 jours → 200 OK (confidence low)
+- [ ] Brief endpoint avec baselines manquantes → 200/204 (pas de crash)
+- [ ] Logs backend: Aucune erreur 500 ou traceback Python
+
+**Base de Données:**
+- [ ] RPC avec user sans baselines → 0 rows (pas d'erreur)
+- [ ] RPC avec user baselines migrées → N rows valides
+- [ ] Query baseline par version → retourne correct model_version
+
+**Mobile:**
+- [ ] Login nouveau user → Pas de crash
+- [ ] Dashboard nouveau user → Message "Collecte en cours"
+- [ ] Dashboard user <10 jours → Message "Données insuffisantes"
+- [ ] Profil baselines vides → Section affiche "En attente"
+- [ ] Orb avec 0 anomalies → Affiche "calm" (gris)
+
+#### Temps Estimé
+- 15-20 minutes par environnement (staging/production)
+- Automatisable avec script de smoke test
+
+#### Script Automatisé (Optionnel)
+
+```bash
+#!/bin/bash
+# smoke-test-post-migration.sh
+
+echo "=== SMOKE TEST POST-MIGRATION ==="
+
+# Config
+API_URL="${1:-http://localhost:8000}"
+NEW_USER_EMAIL="smoke-test-$(date +%s)@pulse.com"
+
+echo "1. Testing with new user (0 baselines)..."
+# Créer user
+SIGNUP_RESPONSE=$(curl -s -X POST "$API_URL/api/auth/signup" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$NEW_USER_EMAIL\",\"password\":\"testpass123\"}")
+
+TOKEN=$(echo $SIGNUP_RESPONSE | jq -r '.access_token')
+
+if [ "$TOKEN" == "null" ]; then
+  echo "❌ Failed to create test user"
+  exit 1
+fi
+
+# Test dashboard
+DASHBOARD_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$API_URL/api/ambient/dashboard" \
+  -H "Authorization: Bearer $TOKEN")
+
+HTTP_CODE=$(echo "$DASHBOARD_RESPONSE" | tail -n 1)
+BODY=$(echo "$DASHBOARD_RESPONSE" | head -n -1)
+
+if [ "$HTTP_CODE" == "200" ]; then
+  echo "✅ Dashboard endpoint OK (HTTP $HTTP_CODE)"
+  
+  # Vérifier structure JSON
+  ANOMALIES_COUNT=$(echo $BODY | jq -r '.anomalies | length')
+  echo "   Anomalies detected: $ANOMALIES_COUNT (expected: 0)"
+  
+  if [ "$ANOMALIES_COUNT" == "0" ]; then
+    echo "✅ No anomalies for new user (correct)"
+  else
+    echo "⚠️  Anomalies found for new user (unexpected but not critical)"
+  fi
+else
+  echo "❌ Dashboard endpoint failed (HTTP $HTTP_CODE)"
+  echo "$BODY"
+  exit 1
+fi
+
+echo ""
+echo "2. Testing brief endpoint..."
+BRIEF_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$API_URL/api/brief/today" \
+  -H "Authorization: Bearer $TOKEN")
+
+BRIEF_HTTP_CODE=$(echo "$BRIEF_RESPONSE" | tail -n 1)
+
+if [ "$BRIEF_HTTP_CODE" == "200" ] || [ "$BRIEF_HTTP_CODE" == "204" ]; then
+  echo "✅ Brief endpoint OK (HTTP $BRIEF_HTTP_CODE)"
+else
+  echo "❌ Brief endpoint failed (HTTP $BRIEF_HTTP_CODE)"
+  exit 1
+fi
+
+echo ""
+echo "=== ALL SMOKE TESTS PASSED ✅ ==="
+```
+
+**Usage:**
+```bash
+chmod +x smoke-test-post-migration.sh
+
+# Staging
+./smoke-test-post-migration.sh https://staging.pulse.com
+
+# Production
+./smoke-test-post-migration.sh https://api.pulse.com
+```
+
 ---
 
 ## 🚨 Phase 6 : Rollback Plan (Si besoin)
