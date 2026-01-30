@@ -1,14 +1,20 @@
 """
-Moteur de priorité pour calculer les baselines (μ, σ) et détecter les anomalies
+Moteur de priorité pour calculer les baselines robustes (median/IQR) et détecter les anomalies
 Utilisé pour l'interface "Ambient Concierge"
+
+MISE À JOUR v2: Utilise statistiques robustes (median/IQR) au lieu de mean/std
 """
 
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-import statistics
 
 from supabase_client import SupabaseClient
+from lib.stats import (
+    compute_robust_stats,
+    detect_anomalies,
+    RobustStats
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,7 +61,9 @@ class PriorityEngine:
         lookback_days: int = 14
     ) -> Dict[str, Dict]:
         """
-        Calcule les baselines (μ, σ) pour chaque métrique sur les N derniers jours
+        Calcule les baselines robustes (median/IQR) pour chaque métrique sur les N derniers jours
+        
+        MISE À JOUR: Utilise statistiques robustes au lieu de mean/std
         
         Args:
             user_id: ID de l'utilisateur
@@ -64,8 +72,8 @@ class PriorityEngine:
         Returns:
             Dict avec structure:
             {
-                "hrv": {"mean": 65.2, "std": 8.5, "weight": 3, "count": 42},
-                "heart_rate": {"mean": 58.1, "std": 3.2, "weight": 3, "count": 120},
+                "hrv": {"median": 65.2, "iqr": 12.5, "p25": 59, "p75": 71, "weight": 3, "count": 42, "confidence": "high"},
+                "heart_rate": {"median": 58.1, "iqr": 5.2, "p25": 55, "p75": 60, "weight": 3, "count": 120, "confidence": "high"},
                 ...
             }
         """
@@ -74,7 +82,7 @@ class PriorityEngine:
             start_date = datetime.now() - timedelta(days=lookback_days)
             start_iso = start_date.isoformat()
             
-            logger.info(f"Calculating baselines for user {user_id} from {start_iso}")
+            logger.info(f"Calculating ROBUST baselines for user {user_id} from {start_iso}")
             
             # Récupérer toutes les biometrics des N derniers jours
             response = self.supabase.client.from_("biometrics").select("*").eq(
@@ -100,26 +108,35 @@ class PriorityEngine:
                         metrics_by_type[metric_type] = []
                     metrics_by_type[metric_type].append(float(value))
             
-            # Calculer μ et σ pour chaque métrique
+            # Calculer statistiques robustes pour chaque métrique
             baselines = {}
             for metric_type, values in metrics_by_type.items():
-                if len(values) >= 3:  # Besoin d'au moins 3 valeurs pour calculer σ
-                    mean = statistics.mean(values)
-                    std = statistics.stdev(values) if len(values) > 1 else 0
-                    weight = METRIC_WEIGHTS.get(metric_type, 1)
+                if len(values) >= 2:  # compute_robust_stats nécessite au moins 2 valeurs
+                    # Utiliser la fonction centralisée
+                    stats = compute_robust_stats(values, include_classical=True)
                     
-                    baselines[metric_type] = {
-                        "mean": round(mean, 2),
-                        "std": round(std, 2),
-                        "weight": weight,
-                        "count": len(values)
-                    }
-                    
-                    logger.debug(
-                        f"{metric_type}: μ={mean:.2f}, σ={std:.2f}, n={len(values)}"
-                    )
+                    if stats:
+                        weight = METRIC_WEIGHTS.get(metric_type, 1)
+                        
+                        baselines[metric_type] = {
+                            "median": stats.median,
+                            "iqr": stats.iqr,
+                            "p25": stats.p25,
+                            "p75": stats.p75,
+                            "mean": stats.mean,  # Inclus pour compatibilité/graphiques
+                            "std": stats.std,    # Inclus pour compatibilité/graphiques
+                            "weight": weight,
+                            "count": stats.count,
+                            "confidence": stats.confidence
+                        }
+                        
+                        logger.debug(
+                            f"{metric_type}: median={stats.median:.2f}, "
+                            f"IQR={stats.iqr:.2f}, n={stats.count}, "
+                            f"confidence={stats.confidence}"
+                        )
             
-            logger.info(f"Calculated baselines for {len(baselines)} metrics")
+            logger.info(f"Calculated ROBUST baselines for {len(baselines)} metrics")
             return baselines
         
         except Exception as e:
@@ -133,7 +150,9 @@ class PriorityEngine:
         baselines: Optional[Dict[str, Dict]] = None
     ) -> List[Dict]:
         """
-        Détecte les anomalies en calculant les Z-Scores
+        Détecte les anomalies en calculant les Z-Scores ROBUSTES
+        
+        MISE À JOUR: Utilise Z-Score robuste (median/IQR) au lieu de (mean/std)
         
         Args:
             user_id: ID de l'utilisateur
@@ -146,11 +165,11 @@ class PriorityEngine:
                 {
                     "metric": "hrv",
                     "value": 45.2,
-                    "z_score": -2.35,
+                    "z_score_robust": -2.35,
                     "weight": 3,
                     "priority": 7.05,
                     "direction": "below",
-                    "baseline": {"mean": 65.2, "std": 8.5}
+                    "baseline": {"median": 65.2, "iqr": 12.5, "p25": 59, "p75": 71}
                 },
                 ...
             ]
@@ -164,51 +183,40 @@ class PriorityEngine:
                 logger.warning(f"No baselines available for user {user_id}")
                 return []
             
-            anomalies = []
+            # Convertir baselines dict → RobustStats objects
+            baselines_objects = {}
+            weights_map = {}
             
-            # Calculer le Z-Score pour chaque métrique
-            for metric, value in current_metrics.items():
-                if metric in baselines:
-                    baseline = baselines[metric]
-                    mean = baseline["mean"]
-                    std = baseline["std"]
-                    weight = baseline["weight"]
-                    
-                    # Éviter division par zéro
-                    if std == 0:
-                        continue
-                    
-                    # Calculer Z-Score
-                    z_score = (value - mean) / std
-                    
-                    # Filtrer : garder uniquement |Z| > 2
-                    if abs(z_score) > 2:
-                        priority = abs(z_score) * weight
-                        direction = "above" if z_score > 0 else "below"
-                        
-                        anomalies.append({
-                            "metric": metric,
-                            "value": round(value, 2),
-                            "z_score": round(z_score, 2),
-                            "weight": weight,
-                            "priority": round(priority, 2),
-                            "direction": direction,
-                            "baseline": {
-                                "mean": mean,
-                                "std": std
-                            }
-                        })
-                        
-                        logger.info(
-                            f"Anomaly detected: {metric}={value:.2f} "
-                            f"(Z={z_score:.2f}, priority={priority:.2f})"
-                        )
+            for metric, baseline_dict in baselines.items():
+                baselines_objects[metric] = RobustStats(
+                    median=baseline_dict['median'],
+                    iqr=baseline_dict['iqr'],
+                    p25=baseline_dict['p25'],
+                    p75=baseline_dict['p75'],
+                    mean=baseline_dict.get('mean'),
+                    std=baseline_dict.get('std'),
+                    count=baseline_dict['count'],
+                    confidence=baseline_dict['confidence']
+                )
+                weights_map[metric] = baseline_dict['weight']
             
-            # Trier par priorité décroissante
-            anomalies.sort(key=lambda x: x["priority"], reverse=True)
+            # Utiliser la fonction centralisée detect_anomalies
+            anomalies_list = detect_anomalies(
+                current_metrics=current_metrics,
+                baselines=baselines_objects,
+                weights=weights_map,
+                threshold_sigma=2.0
+            )
             
-            logger.info(f"Found {len(anomalies)} anomalies for user {user_id}")
-            return anomalies
+            # Log
+            for anomaly in anomalies_list:
+                logger.info(
+                    f"Anomaly detected: {anomaly['metric']}={anomaly['value']} "
+                    f"(Z_robust={anomaly['z_score_robust']:.2f}, priority={anomaly['priority']:.2f})"
+                )
+            
+            logger.info(f"Found {len(anomalies_list)} anomalies for user {user_id}")
+            return anomalies_list
         
         except Exception as e:
             logger.error(f"Error detecting anomalies for user {user_id}: {e}")
