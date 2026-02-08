@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as Device from 'expo-device';
-import * as HealthKit from '@/src/modules/pulseHealthkit';
+import * as HealthKit from '@/modules/pulseHealthkit';
 
 /**
  * Fonction helper pour vérifier si on est sur un simulateur

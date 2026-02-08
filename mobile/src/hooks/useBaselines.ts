@@ -1,77 +1,133 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { storage } from '@/lib/storage';
+import Constants from 'expo-constants';
 
-interface Baseline {
-  mean: number;
-  std: number;
-  weight: 1 | 2 | 3;
-  count: number;
+// ============================================
+// TYPES (Structure standardisée JSONB)
+// ============================================
+
+export interface BaselineData {
+  value: number;
+  unit: string;
+  normal_range: {
+    min: number;
+    max: number;
+  };
+  trend: {
+    slope_per_week: number;
+    direction: 'up' | 'down' | 'flat';
+  };
+  details: Record<string, any>; // Spécifique à chaque type de baseline
 }
 
-interface Baselines {
-  hrv?: Baseline;
-  heart_rate?: Baseline;
-  body_temperature?: Baseline;
-  sleep_duration?: Baseline;
-  sleep?: Baseline;
-  active_calories?: Baseline;
-  stress?: Baseline;
-  glucose?: Baseline;
-  spo2?: Baseline;
-  steps?: Baseline;
-  calories?: Baseline;
-  water?: Baseline;
-  distance?: Baseline;
-  floors_climbed?: Baseline;
-  weight?: Baseline;
-  respiratory_rate?: Baseline;
-  caffeine?: Baseline;
+export interface Baseline {
+  baseline_type: string;
+  baseline_data: BaselineData;
+  calculated_at: string;
+  confidence: number;
+  sample_size: number;
+  model_version: string;
+  window_start: string | null;
+  window_end: string | null;
+  status: 'ok' | 'insufficient_data' | 'error';
+  error_message: string | null;
 }
 
-interface BaselinesResponse {
-  status: string;
-  user_id: string;
-  baselines: Baselines;
-  lookback_days?: number;
-  message?: string;
+export interface UseBaselinesResult {
+  baselines: Baseline[] | undefined;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<UseQueryResult<Baseline[], Error>>;
+  triggerRecalculation: () => Promise<boolean>;
 }
 
-import { API_URL } from '../config/api';
+// ============================================
+// HOOK useBaselines
+// ============================================
 
-async function fetchBaselines(userId: string | null): Promise<Baselines> {
-  if (!userId) {
-    return {};
-  }
+export function useBaselines(userId: string | null): UseBaselinesResult {
+  // Fetch baselines via RPC function
+  const { data, isLoading, error, refetch } = useQuery<Baseline[], Error>({
+    queryKey: ['baselines', userId],
+    queryFn: async () => {
+      console.log('[useBaselines] Fetching baselines for user:', userId);
+      
+      if (!userId) {
+        console.log('[useBaselines] No user ID provided');
+        throw new Error('User ID is required');
+      }
 
-  console.log('[useBaselines] Fetching baselines for user:', userId);
+      const { data, error } = await supabase.rpc('get_user_baselines', {
+        p_user_id: userId,
+      });
 
-  try {
-    const response = await fetch(`${API_URL}/api/baselines/${userId}`);
-    
-    if (!response.ok) {
-      console.error('[useBaselines] Error response:', response.status);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        console.error('[useBaselines] RPC error:', error);
+        throw error;
+      }
+
+      console.log('[useBaselines] Received data:', data);
+      return (data as Baseline[]) || [];
+    },
+    enabled: !!userId,
+    staleTime: 24 * 60 * 60 * 1000, // 24h - Les baselines ne changent qu'une fois par jour (cron)
+    gcTime: 7 * 24 * 60 * 60 * 1000, // 7 jours de cache (anciennement cacheTime)
+    refetchOnMount: 'always', // Toujours refetch au mount pour s'assurer d'avoir les données
+    refetchOnWindowFocus: false, // Ne pas refetch au focus
+  });
+
+  /**
+   * Déclenche un recalcul manuel des baselines
+   * Appelle l'endpoint backend protégé par JWT utilisateur
+   */
+  const triggerRecalculation = async (): Promise<boolean> => {
+    if (!userId) {
+      console.error('No user ID, cannot trigger recalculation');
+      return false;
     }
 
-    const data: BaselinesResponse = await response.json();
-    
-    console.log('[useBaselines] Fetched baselines:', Object.keys(data.baselines || {}).length, 'metrics');
-    
-    return data.baselines || {};
-  } catch (error) {
-    console.error('[useBaselines] Error fetching baselines:', error);
-    throw error;
-  }
-}
+    try {
+      // Récupérer le token d'authentification
+      const token = await storage.getAccessToken();
+      if (!token) {
+        console.error('No access token found');
+        return false;
+      }
 
-export function useBaselines(userId: string | null) {
-  return useQuery({
-    queryKey: ['baselines', userId],
-    queryFn: () => fetchBaselines(userId),
-    enabled: !!userId,
-    staleTime: 24 * 60 * 60 * 1000, // 24h cache (baselines changent lentement)
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-}
+      // Récupérer l'URL du backend depuis la config
+      const backendUrl = Constants.expoConfig?.extra?.backendUrl || 'http://localhost:9000';
 
-export type { Baseline, Baselines };
+      // Appeler l'endpoint
+      const response = await fetch(`${backendUrl}/api/baselines/calculate/${userId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to trigger recalculation:', response.status, errorText);
+        return false;
+      }
+
+      // Invalider le cache et refetch
+      await refetch();
+
+      return true;
+    } catch (error) {
+      console.error('Error triggering recalculation:', error);
+      return false;
+    }
+  };
+
+  return {
+    baselines: data,
+    loading: isLoading,
+    error: error,
+    refetch: refetch as any,
+    triggerRecalculation,
+  };
+}

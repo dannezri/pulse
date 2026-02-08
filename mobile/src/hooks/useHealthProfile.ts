@@ -23,6 +23,7 @@ interface HealthProfile {
 async function fetchHealthProfile(userId: string | null): Promise<HealthProfile | null> {
   if (!userId) return null;
 
+  // Récupère le profil de santé le plus récent (incluant le jour actuel si disponible)
   const { data, error } = await supabase
     .from('health_profiles')
     .select('*')

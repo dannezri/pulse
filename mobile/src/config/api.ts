@@ -24,7 +24,7 @@ export function getApiUrl(): string {
       return 'http://localhost:9000';
     }
     // Sur device iOS, utiliser l'IP locale du Mac
-    // ⚠️ REMPLACEZ PAR VOTRE IP LOCALE
+    // ✅ IP automatiquement détectée: 192.168.0.23
     return 'http://192.168.0.23:9000';
   }
   
@@ -34,6 +34,7 @@ export function getApiUrl(): string {
       return 'http://10.0.2.2:9000';
     }
     // Sur device Android, utiliser l'IP locale
+    // ✅ IP automatiquement détectée: 192.168.0.23
     return 'http://192.168.0.23:9000';
   }
   

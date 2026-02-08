@@ -6,8 +6,14 @@ Découplé de la normalisation pour répondre rapidement
 from typing import Dict, Optional
 import logging
 from datetime import datetime
+import sys
+import os
+
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from supabase_client import SupabaseClient
-from open_wearables_integration import OpenWearablesIntegration
+from legacy.open_wearables_integration import OpenWearablesIntegration
 from job_queue import push_normalization_job
 
 logging.basicConfig(level=logging.INFO)

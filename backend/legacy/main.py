@@ -4,14 +4,18 @@ Peut être utilisé comme script standalone ou importé dans une API
 """
 
 import os
+import sys
 import hashlib
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 import logging
 
-from open_wearables_integration import OpenWearablesIntegration
-from data_normalizer import DataNormalizer
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from legacy.open_wearables_integration import OpenWearablesIntegration
+from legacy.data_normalizer import DataNormalizer
 from supabase_client import SupabaseClient
 
 logging.basicConfig(level=logging.INFO)

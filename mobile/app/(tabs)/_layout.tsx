@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, History, User, Pill, Link, Activity } from "lucide-react-native";
+import { Home, History, User, Link, Activity, Utensils, Zap } from "lucide-react-native";
 
 export default function TabsLayout() {
   // Note: Authentication is handled by app/index.tsx and useAuth hook
@@ -25,9 +25,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Pulse",
+          title: "Accueil",
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
-          // Style minimaliste pour l'écran principal (immersif)
+          // Style plein écran immersif pour le Brief
           tabBarStyle: {
             backgroundColor: "#000000",
             borderTopColor: "transparent",
@@ -39,38 +39,57 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="connections"
-        options={{
-          title: "Sources",
-          tabBarIcon: ({ color, size }) => <Link size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="medications"
-        options={{
-          title: "Médicaments",
-          tabBarIcon: ({ color, size }) => <Pill size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="requests"
         options={{
-          title: "Webhooks",
+          title: "Données",
           tabBarIcon: ({ color, size }) => <Activity size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="energie"
         options={{
-          title: "Historique",
+          title: "Énergie",
+          tabBarIcon: ({ color, size }) => <Zap size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="food-diary"
+        options={{
+          title: "Nutrition",
+          tabBarIcon: ({ color, size }) => <Utensils size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tendances"
+        options={{
+          title: "Tendances",
           tabBarIcon: ({ color, size }) => <History size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="profil"
         options={{
           title: "Profil",
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+        }}
+      />
+      {/* Anciens écrans Food Diary - cachés de la navigation */}
+      <Tabs.Screen
+        name="journal"
+        options={{
+          href: null, // Cache de la navigation
+        }}
+      />
+      <Tabs.Screen
+        name="search-food"
+        options={{
+          href: null, // Cache de la navigation
+        }}
+      />
+      <Tabs.Screen
+        name="food-details"
+        options={{
+          href: null, // Cache de la navigation
         }}
       />
     </Tabs>

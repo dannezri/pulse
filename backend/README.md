@@ -10,6 +10,8 @@ backend/
 ├── vital_webhook.py        # Gestionnaire webhook Vital (validation, mapping identity, idempotence)
 ├── correlation_engine.py   # Moteur de corrélation (biometrics + daily_context → insight)
 ├── llm_client.py          # Client LLM (GPT-4o)
+├── gemini_client.py       # Client Gemini avec mode thinking (nouveau)
+├── explain_service.py     # Service d'explication énergétique (utilise Gemini)
 ├── jwt_auth.py            # Authentification JWT Supabase
 ├── supabase_client.py     # Client Supabase (service role)
 └── requirements.txt       # Dépendances Python
@@ -40,8 +42,12 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-role-key
 SUPABASE_ANON_KEY=your-anon-key  # Pour JWT verification
 
-# OpenAI
+# OpenAI (utilisé par correlation_engine, wellness_coach)
 OPENAI_API_KEY=sk-...
+
+# Google Gemini (utilisé par explain_service pour "Pourquoi ce score ?")
+GOOGLE_API_KEY=your-google-api-key
+GEMINI_MODEL=gemini-2.0-flash-thinking-exp-01-21  # Optionnel
 
 # Cron Secret
 CRON_SECRET=your-secret-for-cron-endpoint
@@ -135,113 +141,6 @@ Récupère le dernier insight pour l'utilisateur authentifié
 - `401` : Token invalide ou manquant
 - `404` : Aucun insight trouvé
 
-## 🔗 Endpoints Vital
-
-### POST `/api/vital/create-user`
-
-Crée un utilisateur Vital et enregistre l'identité externe
-
-**Protection** : JWT Supabase (header `Authorization: Bearer <token>`)
-
-**Processus** :
-1. Vérifie le token JWT et extrait `user_id`
-2. Crée l'utilisateur Vital via l'API
-3. Enregistre l'identité dans `external_identities` (provider_system="vital")
-
-**Réponses** :
-- `200` : Utilisateur créé avec `vital_user_id`
-- `401` : Token invalide ou manquant
-- `503` : Vital client non configuré
-
-**Exemple** :
-```bash
-curl -X POST http://localhost:9000/api/vital/create-user \
-  -H "Authorization: Bearer <jwt>" \
-  -H "Content-Type: application/json"
-```
-
-### POST `/api/vital/link-token`
-
-Génère un token Vital Link pour connecter des sources
-
-**Protection** : JWT Supabase (header `Authorization: Bearer <token>`)
-
-**Processus** :
-1. Vérifie le token JWT et extrait `user_id`
-2. Récupère le `vital_user_id` depuis `external_identities`
-3. Génère un link token via l'API Vital
-
-**Réponses** :
-- `200` : Token généré avec `link_token` et `expires_at`
-- `401` : Token invalide ou manquant
-- `404` : Utilisateur Vital non trouvé
-- `503` : Vital client non configuré
-
-**Exemple** :
-```bash
-curl -X POST http://localhost:9000/api/vital/link-token \
-  -H "Authorization: Bearer <jwt>" \
-  -H "Content-Type: application/json"
-```
-
-### GET `/api/vital/connections`
-
-Liste les sources connectées pour l'utilisateur
-
-**Protection** : JWT Supabase (header `Authorization: Bearer <token>`)
-
-**Processus** :
-1. Vérifie le token JWT et extrait `user_id`
-2. Récupère le `vital_user_id` depuis `external_identities`
-3. Liste les connexions via l'API Vital
-
-**Réponses** :
-- `200` : Liste des providers connectés
-  ```json
-  {
-    "status": "success",
-    "providers": [
-      {
-        "name": "Apple Health",
-        "slug": "apple_health",
-        "status": "connected",
-        "created_at": "2024-01-15T10:00:00Z",
-        "last_sync_at": "2024-01-15T12:00:00Z"
-      }
-    ]
-  }
-  ```
-- `401` : Token invalide ou manquant
-- `404` : Utilisateur Vital non trouvé
-- `503` : Vital client non configuré
-
-**Exemple** :
-```bash
-curl -X GET http://localhost:9000/api/vital/connections \
-  -H "Authorization: Bearer <jwt>"
-```
-
-### DELETE `/api/vital/connections/{provider_slug}`
-
-Déconnecte une source pour l'utilisateur
-
-**Protection** : JWT Supabase (header `Authorization: Bearer <token>`)
-
-**Args** :
-- `provider_slug` : Slug du provider (ex: "apple_health", "fitbit")
-
-**Réponses** :
-- `200` : Provider déconnecté
-- `401` : Token invalide ou manquant
-- `404` : Utilisateur Vital non trouvé
-- `503` : Vital client non configuré
-
-**Exemple** :
-```bash
-curl -X DELETE http://localhost:9000/api/vital/connections/fitbit \
-  -H "Authorization: Bearer <jwt>"
-```
-
 ## 🔧 Configuration Cron
 
 Pour générer les insights quotidiennement, configurer un cron externe (ex: GitHub Actions, Vercel Cron, etc.) :
@@ -256,24 +155,12 @@ curl -X POST https://your-api.com/api/cron/daily-insight \
 
 ## 📝 Notes
 
-- **Idempotence** : Les webhooks Vital utilisent `source_event_id` pour éviter les doublons
-- **Mapping Identity** : Vital `user_id` doit être présent dans `external_identities` avec `provider_system="vital"`
 - **JWT** : Les tokens Supabase sont vérifiés via le client Supabase (recommandé)
-- **Vital Configuration** : Voir [`mobile/VITAL_SETUP.md`](../mobile/VITAL_SETUP.md) pour la configuration complète
+- **Idempotence** : Les webhooks utilisent des identifiants uniques pour éviter les doublons
 
 ## 🧪 Tests
 
 ```bash
-# Test webhook Vital
-curl -X POST http://localhost:9000/api/webhooks/vital \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "vital_user_123",
-    "data": {
-      "hr": [{"value": 72, "timestamp": "2024-01-15T10:00:00Z"}]
-    }
-  }'
-
 # Test cron (nécessite CRON_SECRET)
 curl -X POST http://localhost:9000/api/cron/daily-insight \
   -H "Content-Type: application/json" \
@@ -283,21 +170,4 @@ curl -X POST http://localhost:9000/api/cron/daily-insight \
 # Test insights latest (nécessite JWT)
 curl -X GET http://localhost:9000/api/insights/latest \
   -H "Authorization: Bearer <supabase-jwt-token>"
-
-# Test Vital endpoints
-# 1. Créer un utilisateur Vital
-curl -X POST http://localhost:9000/api/vital/create-user \
-  -H "Authorization: Bearer <jwt>"
-
-# 2. Générer un link token
-curl -X POST http://localhost:9000/api/vital/link-token \
-  -H "Authorization: Bearer <jwt>"
-
-# 3. Récupérer les connexions
-curl -X GET http://localhost:9000/api/vital/connections \
-  -H "Authorization: Bearer <jwt>"
-
-# 4. Déconnecter un provider
-curl -X DELETE http://localhost:9000/api/vital/connections/fitbit \
-  -H "Authorization: Bearer <jwt>"
 ```

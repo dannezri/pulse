@@ -7,11 +7,16 @@
 
 import { Platform, Alert } from 'react-native';
 import * as Device from 'expo-device';
-import * as HealthKit from '@/src/modules/pulseHealthkit';
-import { supabase } from '@/src/lib/supabase';
-import { storage } from '@/src/lib/storage';
+import * as HealthKit from '@/modules/pulseHealthkit';
+import { supabase } from '@/lib/supabase';
+import { storage } from '@/lib/storage';
 import * as SecureStore from 'expo-secure-store';
 import type { Medication } from '../hooks/useMedications';
+
+// Options de sécurité pour le Keychain iOS
+const KEYCHAIN_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
 
 /**
  * Vérifie si on est sur un simulateur
@@ -26,7 +31,7 @@ function isSimulator(): boolean {
 async function loadManualMedications(fromISO: string, toISO: string): Promise<Medication[]> {
   try {
     const STORAGE_KEY = 'pulse_medications';
-    const stored = await SecureStore.getItemAsync(STORAGE_KEY);
+    const stored = await SecureStore.getItemAsync(STORAGE_KEY, KEYCHAIN_OPTIONS);
     
     if (!stored) {
       return [];

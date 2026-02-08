@@ -16,6 +16,7 @@ interface Insight {
 async function fetchLatestInsight(userId: string | null): Promise<Insight | null> {
   if (!userId) return null;
 
+  // Récupère l'insight le plus récent (incluant ceux créés aujourd'hui)
   const { data, error } = await supabase
     .from('insights')
     .select('*')

@@ -1,147 +1,78 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
-import { supabase } from '@/src/lib/supabase';
-import { storage } from '@/src/lib/storage';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, Alert } from "react-native";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
-  const [openWearablesUserId, setOpenWearablesUserId] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async () => {
-    if (!openWearablesUserId.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer votre Open Wearables User ID');
+    if (!email || !password) {
+      Alert.alert("Erreur", "Veuillez remplir tous les champs");
       return;
     }
 
-    const trimmedId = openWearablesUserId.trim();
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    try {
-      setLoading(true);
+    setLoading(false);
 
-      // Utiliser la fonction PostgreSQL pour rechercher par open_wearables_user_id
-      const { data: profileData, error: profileError } = await supabase
-        .rpc('get_user_by_open_wearables_id', { open_wearables_id: trimmedId });
-
-      if (profileError) {
-        console.error('Erreur Supabase:', profileError);
-        Alert.alert('Erreur', `Erreur lors de la recherche: ${profileError.message}`);
-        return;
-      }
-
-      if (!profileData || profileData.length === 0) {
-        Alert.alert('Erreur', `Open Wearables User ID "${trimmedId}" non trouvé dans la base de données`);
-        return;
-      }
-
-      // Récupérer l'UUID Supabase du profil
-      const profile = profileData[0];
-      const supabaseUserId = profile.id;
-
-      // Stocker l'UUID localement
-      await storage.saveUserId(supabaseUserId);
-
-      // Rediriger vers les tabs
-      router.replace('/(tabs)');
-    } catch (err) {
-      Alert.alert('Erreur', 'Une erreur est survenue');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    if (error) {
+      Alert.alert("Erreur de connexion", error.message);
+    } else if (data.session) {
+      router.replace("/(tabs)");
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Pulse</Text>
-      <Text style={styles.subtitle}>
-        Entrez votre Open Wearables User ID
-      </Text>
+    <SafeAreaView className="flex-1 bg-black">
+      <View className="flex-1 items-center justify-center px-6">
+        <Text className="text-white text-3xl font-bold mb-2">Pulse</Text>
+        <Text className="text-gray-400 text-center mb-8">
+          Connectez-vous pour accéder à vos données de santé
+        </Text>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Open Wearables User ID"
-          placeholderTextColor="#666"
-          value={openWearablesUserId}
-          onChangeText={setOpenWearablesUserId}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
+        <View className="w-full mb-4">
+          <Text className="text-gray-400 text-sm mb-2">Email</Text>
+          <TextInput
+            className="bg-gray-900 text-white rounded-xl p-4 border border-gray-800"
+            placeholder="votre@email.com"
+            placeholderTextColor="#666666"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+        </View>
+
+        <View className="w-full mb-6">
+          <Text className="text-gray-400 text-sm mb-2">Mot de passe</Text>
+          <TextInput
+            className="bg-gray-900 text-white rounded-xl p-4 border border-gray-800"
+            placeholder="••••••••"
+            placeholderTextColor="#666666"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        </View>
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          className="bg-primary w-full rounded-xl p-4 items-center"
           onPress={handleLogin}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.buttonText}>Se connecter</Text>
-          )}
+          <Text className="text-black font-bold text-lg">
+            {loading ? "Connexion..." : "Se connecter"}
+          </Text>
         </TouchableOpacity>
-
-        <Text style={styles.helpText}>
-          Entrez votre identifiant Open Wearables
-        </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#999999',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  form: {
-    width: '100%',
-  },
-  input: {
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  helpText: {
-    marginTop: 16,
-    color: '#666666',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-});

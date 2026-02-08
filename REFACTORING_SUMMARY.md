@@ -1,230 +1,311 @@
-# Résumé du Refactoring MVP v2.0
+# Refactoring API Giygas - Résumé Exécutif
 
-## 📋 Vue d'Ensemble
-
-Refactoring complet pour appliquer le **Nouveau MVP v2.0** : Vital flux + Apple Health context + LLM correlation.
-
-**Date** : 2024
-**Version** : 2.0.0
+**Date:** 4 Février 2026  
+**Durée estimée déploiement:** 15 minutes  
+**Impact:** Majeur (système médicaments)
 
 ---
 
-## ✅ Fichiers Créés
+## ✅ Ce qui a été modifié
 
-### Backend
-- `backend/api_server_mvp.py` : API FastAPI minimal (MVP v2.0)
-- `backend/vital_webhook.py` : Gestionnaire webhook Vital (validation Pydantic, mapping identity, idempotence)
-- `backend/jwt_auth.py` : Authentification JWT Supabase
-- `backend/README.md` : Documentation backend minimal
-- `backend/config.example.env` : Template configuration
+### 📦 Fichiers Créés (3)
 
-### Mobile
-- `mobile/src/services/HealthScanner.ts` : Service de synchronisation contexte Apple Health
-- `mobile/scripts/check-deps.sh` : Script de vérification dépendances
+1. **`backend/giygas_medication_service.py`** (495 lignes)
+   - Service complet API Giygas
+   - Remplace `medication_service.py` (ancien BDPM)
+   - Méthodes : search, get_by_cis, get_by_cip13, parse_gtin
 
-### Database
-- `database/migrations/009_mvp_context_and_insights.sql` : Migration MVP v2.0 (appliquée)
+2. **`database/migrations/034_giygas_medications_refactor.sql`**
+   - Nouvelle table `drug_presentations` (CIP13/CIP7, prix)
+   - Extension `medication_details` (composition, conditions)
+   - Fonction `gtin_to_cip13()` pour scan boîtes
+   - Vue `medications_full`
 
-### Documentation
-- `MVP.md` : Mis à jour pour MVP v2.0
-- `ARCHITECTURE.md` : Mis à jour pour MVP v2.0
-- `DEPLOYMENT.md` : Guide de déploiement complet
-- `.cursor/rules/mvp-v2.md` : Règles Cursor pour MVP v2.0
+3. **`GIYGAS_MIGRATION_GUIDE.md`** (documentation complète)
+   - Architecture, mapping, tests, troubleshooting
 
----
+### 📝 Fichiers Modifiés (1)
 
-## 📦 Fichiers Archivés (Legacy)
+1. **`backend/api_server.py`**
+   - Ligne 38 : `from giygas_medication_service import GiygasMedicationService`
+   - Ligne 60 : `medication_service = GiygasMedicationService(...)`
+   - Endpoints adaptés : `/api/medications/search`, `/api/medications/{id}`
+   - Nouvel endpoint : `POST /api/medications/scan` (GS1 DataMatrix)
 
-### Backend
-- `backend/legacy/data_normalizer.py` : Normalisation avec baselines/anomalies (legacy)
-- `backend/legacy/main.py` : DataPipeline Open Wearables (legacy)
-- `backend/legacy/insight_generator.py` : Génération insights health_profiles (legacy)
-- `backend/legacy/webhook_receiver.py` : Récepteur webhook Open Wearables (legacy)
-- `backend/legacy/open_wearables_integration.py` : Client Open Wearables (legacy)
-- `backend/legacy/workers/` : Workers Celery (legacy)
+### 🗑️ Fichiers Obsolètes (À conserver temporairement)
 
-### Documentation
-- `docs/legacy/DATA_QUALITY.md` : Documentation qualité données (legacy)
-- `docs/legacy/PROFILE_VERSIONING.md` : Documentation versioning (legacy)
-- `docs/legacy/NORMALIZATION_STRATEGY.md` : Documentation normalisation (legacy)
+1. **`backend/medication_service.py`**
+   - Ancienne version BDPM/open-medicaments
+   - ⚠️ Ne pas supprimer immédiatement
+   - Pourra être retiré après validation complète
 
 ---
 
-## 🔄 Fichiers Modifiés
+## 🎯 Résultat
 
-### Backend
-- `backend/correlation_engine.py` : Amélioré pour gérer données insuffisantes (insight neutre)
-- `backend/api_server.py` : Conservé pour compatibilité (utiliser `api_server_mvp.py` pour MVP v2.0)
+### Avant (BDPM/open-medicaments.fr)
 
-### Mobile
-- `mobile/app/(tabs)/index.tsx` : Bouton "Synchroniser Contexte" ajouté
-- `mobile/src/modules/pulseHealthkit/index.ts` : Fonctions readNutrition, readMedications, readSymptoms, readStool ajoutées
-- `mobile/pulse-healthkit/ios/PulseHealthkitModule.swift` : Fonctions contexte HealthKit ajoutées
+```python
+# Recherche limitée
+{
+  "cis": "60001551",
+  "name": "Doliprane 500mg",
+  "form": "Comprimé",
+  "laboratory": "Sanofi"
+}
 
----
+# Pas de :
+# - Composition détaillée
+# - Prix/remboursement
+# - Scan boîtes
+```
 
-## 🗄️ Schéma Database
+### Après (API Giygas)
 
-### Tables MVP v2.0
+```python
+# Recherche enrichie
+{
+  "cis": "60001551",
+  "name": "DOLIPRANE 500 mg, comprimé",
+  "form": "comprimé",
+  "laboratory": "OPELLA HEALTHCARE FRANCE SAS",
+  "active_substance": "PARACETAMOL",
+  "composition": [
+    {"substance": "PARACETAMOL", "dosage": "500", "unite": "mg"}
+  ],
+  "generics": [...],
+  "presentations": [
+    {"cip13": "3400930001551", "price": 2.50, "reimbursement_rate": 65}
+  ],
+  "conditions": {...}
+}
 
-#### `biometrics`
-- Colonnes : `user_id`, `metric_type`, `value`, `measured_at`, `source`, `source_event_id`, `metadata` (JSONB)
-- Index : `(user_id, measured_at DESC)`, `(user_id, metric_type, measured_at DESC)`
-- Idempotence : Contrainte unique `(user_id, source, source_event_id)`
-
-#### `daily_context`
-- Colonnes : `user_id`, `category`, `details` (JSONB), `logged_at`, `source`
-- Index : `(user_id, logged_at DESC)`, `(user_id, category, logged_at DESC)`
-- RLS : SELECT/INSERT pour `auth.uid() = user_id`
-
-#### `insights`
-- Colonnes : `user_id`, `content`, `correlation_type`, `priority`, `created_at`
-- RLS : SELECT pour `auth.uid() = user_id`
-
-#### `external_identities`
-- Colonnes : `supabase_user_id`, `provider_system`, `external_user_id`, `metadata`, `is_active`
-- Contrainte unique : `(supabase_user_id, provider_system, external_user_id)`
-
-### Fonctions RPC
-
-- `get_recent_biometrics(user_id, limit)` : Récupère N derniers biometrics
-- `get_recent_daily_context(user_id, limit)` : Récupère N derniers daily_context
-- `get_latest_insight(user_id)` : Récupère dernier insight
-
----
-
-## 📡 Endpoints API
-
-### POST `/api/webhooks/vital`
-- **Rôle** : Reçoit webhooks Vital API (HR, HRV, Sleep)
-- **Validation** : Pydantic schema
-- **Mapping** : Vital user_id → Supabase user_id via `external_identities`
-- **Idempotence** : `source_event_id` unique
-- **Réponses** : 200 (succès), 202 (accepté mais user non trouvé), 400 (payload invalide)
-
-### POST `/api/cron/daily-insight`
-- **Rôle** : Génère insights quotidiens
-- **Protection** : Header `X-Cron-Secret`
-- **Processus** : Corrèle 10 derniers biometrics + 10 derniers daily_context → LLM → insights
-- **Réponses** : 200 (insight généré), 401 (secret invalide), 400 (user_id manquant)
-
-### GET `/api/insights/latest`
-- **Rôle** : Récupère dernier insight utilisateur
-- **Protection** : JWT Supabase (header `Authorization: Bearer <token>`)
-- **Réponses** : 200 (insight trouvé), 401 (token invalide), 404 (aucun insight)
+# Nouveau : Scan boîtes (GTIN → CIP13 → Médicament)
+```
 
 ---
 
-## 📱 Mobile
+## ⚠️ Points de Vigilance
 
-### Service HealthScanner
-- **Fichier** : `mobile/src/services/HealthScanner.ts`
-- **Fonction** : `syncLast6Hours()` : Scanne contexte Apple Health des 6 dernières heures
-- **Catégories** : Nutrition (calories, carbs), Médicaments, Symptômes, Selles
-- **Insertion** : Supabase client avec session user (RLS)
-- **Best Effort** : Retourne [] si catégorie indisponible (pas de crash)
+### 1. ICD-11 Inchangée ✅
 
-### Module Natif iOS
-- **Fichier** : `mobile/pulse-healthkit/ios/PulseHealthkitModule.swift`
-- **Fonctions** :
-  - `readNutrition(fromISO, toISO)` : Calories et glucides
-  - `readMedications(fromISO, toISO)` : Médicaments (stub si indisponible)
-  - `readSymptoms(fromISO, toISO)` : Symptômes (stub si indisponible)
-  - `readStool(fromISO, toISO)` : Selles (stub si indisponible)
+**ICD-11 n'a JAMAIS été utilisée pour les médicaments.**
 
-### UI
-- **Bouton** : "Synchroniser Contexte" (iOS uniquement, device réel)
-- **Messages** :
-  - Simulateur : "HealthKit indisponible sur simulateur"
-  - Android : "HealthKit disponible uniquement sur iOS"
-  - Succès : "Contexte synchronisé. Pulse analyse vos données…"
+- ✅ ICD-11 reste pour diagnostics/conditions de santé
+- ✅ Endpoint `/api/terminology/icd11/search` inchangé
+- ✅ Table `user_conditions` inchangée
 
----
+**Aucune action requise sur ICD-11.**
 
-## 🔐 Sécurité
+### 2. GTIN → CIP13 : Limitations
 
-### RLS (Row Level Security)
-- `daily_context` : SELECT/INSERT pour `auth.uid() = user_id`
-- `insights` : SELECT pour `auth.uid() = user_id`
-- `biometrics` : INSERT via service role (backend), SELECT via policies
+- ⚠️ GTIN-14 → CIP13 : Enlève 1er chiffre (packaging indicator)
+- ⚠️ GTIN-13 = CIP13 directement
+- ⚠️ Formats invalides : Retour null + log
 
-### Authentification
-- **JWT** : Vérification via Supabase client (recommandé)
-- **Cron Secret** : Header `X-Cron-Secret` pour protéger endpoint cron
-- **Service Role** : Utilisé uniquement côté backend (webhooks, cron)
+**Solution :** Fonction `parse_gtin_to_cip13()` gère automatiquement.
 
-### Idempotence
-- **Webhook Vital** : `source_event_id` unique par événement
-- **Contrainte unique** : `(user_id, source, source_event_id)` sur `biometrics`
+### 3. Migration Progressive
+
+**Stratégie :**
+- Nouvelles données → `source='giygas'`
+- Anciennes données → `source='bdpm'` (conservées)
+- Coexistence temporaire
+
+**Pas de perte de données.**
 
 ---
 
-## 🧪 Tests
+## 🚀 Déploiement
 
-### Test Webhook Vital
+### Étape 1 : Migration DB
+
 ```bash
-curl -X POST http://localhost:9000/api/webhooks/vital \
+# Via Supabase Dashboard (recommandé)
+1. Ouvrir https://app.supabase.com
+2. SQL Editor → New Query
+3. Copier-coller database/migrations/034_giygas_medications_refactor.sql
+4. Run
+```
+
+### Étape 2 : Redémarrer Backend
+
+```bash
+cd backend
+./restart_backend.sh
+# ou
+pkill -f "python.*api_server"
+python api_server.py
+```
+
+### Étape 3 : Vérifier
+
+```bash
+# Test recherche
+curl "http://localhost:9000/api/medications/search?q=doliprane"
+
+# Test détails
+curl "http://localhost:9000/api/medications/60001551"
+
+# Test scan
+curl -X POST "http://localhost:9000/api/medications/scan" \
   -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "vital_user_123",
-    "event_id": "test_event_001",
-    "data": {
-      "hr": [{"value": 72, "timestamp": "2024-01-15T10:00:00Z"}]
-    }
-  }'
+  -d '{"gtin": "34009300015517"}'
 ```
 
-### Test Cron Insight
-```bash
-curl -X POST http://localhost:9000/api/cron/daily-insight \
-  -H "Content-Type: application/json" \
-  -H "X-Cron-Secret: your-secret" \
-  -d '{"user_id": "uuid"}'
-```
+### Étape 4 : Vérifier DB
 
-### Test Insights Latest
-```bash
-curl -X GET http://localhost:9000/api/insights/latest \
-  -H "Authorization: Bearer <supabase-jwt-token>"
-```
+```sql
+-- Vérifier table drug_presentations
+SELECT * FROM drug_presentations LIMIT 1;
 
-### Test Mobile
-1. Lancer sur device iOS réel
-2. Cliquer "Synchroniser Contexte"
-3. Vérifier notification et données dans `daily_context`
+-- Vérifier fonction GTIN
+SELECT gtin_to_cip13('34009300015517');
+-- Expected: 3400930001551
+
+-- Vérifier vue medications_full
+SELECT * FROM medications_full LIMIT 5;
+```
 
 ---
 
-## 📝 Notes Importantes
+## 📊 Nouveaux Endpoints
 
-### HealthKit
-- **Simulateur** : HealthKit indisponible (message explicite)
-- **Best Effort** : Catégories indisponibles retournent [] sans crash
-- **Permissions** : Demandées automatiquement via module natif
+### 1. Recherche (adapté)
 
-### Mapping Identity
-- **Vital** : `user_id` Vital doit être dans `external_identities` avec `provider_system="vital"`
-- **Si absent** : Webhook accepté (202) mais non traité
+**`GET /api/medications/search?q=doliprane`**
 
-### Données Insuffisantes
-- **Si < 3 biometrics ET < 3 context** : Insight neutre retourné
-- **Message** : "Pas assez de données pour générer un insight"
+Retourne médicaments avec composition, substance active, laboratoire.
 
-### Dépendances
-- **Expo/RN** : Toujours utiliser `cd mobile && npx expo install <package>`
-- **Node** : Respecter `engines.node >= 20.19.4`
-- **Vérification** : `cd mobile && npx expo-doctor`
+### 2. Détails (adapté)
+
+**`GET /api/medications/60001551`**
+
+Retourne médicament complet : composition, génériques, présentations (CIP13, prix), conditions.
+
+### 3. Scan Boîte (nouveau) ✨
+
+**`POST /api/medications/scan`**
+
+**Body :**
+```json
+{
+  "gtin": "34009300015517"
+}
+```
+
+**Réponse :**
+```json
+{
+  "gtin": "34009300015517",
+  "cip13": "3400930001551",
+  "medication": {
+    "cis": "60001551",
+    "name": "DOLIPRANE 500 mg, comprimé",
+    ...
+  }
+}
+```
 
 ---
 
-## 🚀 Prochaines Étapes
+## 🗂️ Schéma DB - Changements
 
-1. **Configurer Vital Webhook** : Ajouter webhook dans dashboard Vital
-2. **Configurer Cron** : Mettre en place cron quotidien pour génération insights
-3. **Tester sur Device iOS** : Vérifier synchronisation contexte
-4. **Vérifier Insights** : S'assurer que les insights sont générés correctement
+### Nouvelle Table : `drug_presentations`
+
+| Colonne | Type | Description |
+|---|---|---|
+| `id` | UUID | Clé primaire |
+| `item_id` | UUID | FK vers medications_catalog |
+| `cip13` | TEXT | **Code CIP 13 chiffres (unique)** |
+| `cip7` | TEXT | Code CIP 7 chiffres (ancien) |
+| `label` | TEXT | Libellé présentation |
+| `price` | NUMERIC | Prix public TTC (€) |
+| `reimbursement_rate` | INTEGER | Taux remboursement (0-100%) |
+| `status` | TEXT | Statut AMM |
+
+**Index :** `cip13` (unique), `cip7`, `item_id`
+
+### Extension : `medication_details`
+
+**Nouvelles colonnes :**
+- `composition` JSONB : Composition détaillée
+- `conditions` JSONB : Conditions de prescription
 
 ---
 
-*Version : 2.0.0*
-*Date : 2024*
+## 📋 Checklist de Validation
+
+### Backend
+
+- [ ] Migration 034 appliquée sans erreurs
+- [ ] Fichier `giygas_medication_service.py` présent
+- [ ] `api_server.py` modifié (import GiygasMedicationService)
+- [ ] Backend redémarré : `python api_server.py` → 0 erreur
+
+### Base de Données
+
+- [ ] Table `drug_presentations` existe
+- [ ] Fonction `gtin_to_cip13('34009300015517')` → `3400930001551`
+- [ ] Vue `medications_full` accessible
+- [ ] RLS activé sur `drug_presentations`
+
+### Endpoints
+
+- [ ] `GET /api/medications/search?q=test` → 200 OK
+- [ ] `GET /api/medications/60001551` → Détails complets
+- [ ] `POST /api/medications/scan` → Conversion GTIN OK
+
+### Mobile (à adapter)
+
+- [ ] Page recherche : Adapter pour champs Giygas
+- [ ] Fiche médicament : Afficher composition, présentations
+- [ ] (Optionnel) Ajouter scanner code-barres
+
+---
+
+## 🎯 TODO Future
+
+### Phase 1 : Validation (cette semaine)
+
+- [ ] Tester 20+ médicaments courants
+- [ ] Vérifier cache fonctionne (2ème recherche rapide)
+- [ ] Vérifier génériques retournés correctement
+- [ ] Tester scan avec GTIN réels
+
+### Phase 2 : Enrichissement (semaine prochaine)
+
+- [ ] Ajouter code ATC (via source complémentaire)
+- [ ] Ajouter URL notice ANSM
+- [ ] Lier conditions ICD-11 ↔ indications médicaments
+- [ ] Photos boîtes médicaments
+
+### Phase 3 : Mobile (2 semaines)
+
+- [ ] Adapter composants affichage composition
+- [ ] Ajouter onglet "Présentations" (prix, remboursement)
+- [ ] Intégrer scanner caméra (GS1 DataMatrix)
+- [ ] Flow scan → fiche → ajout traitement
+
+---
+
+## 📚 Documentation
+
+**Guide complet :** `GIYGAS_MIGRATION_GUIDE.md`
+
+Contient :
+- Architecture détaillée
+- Mapping API Giygas → DB
+- Flow scan boîtes (GTIN → CIP13)
+- Tests complets
+- Troubleshooting
+
+---
+
+## ✨ Résumé 1 Ligne
+
+**API BDPM/open-medicaments → API Giygas + scan boîtes (GTIN→CIP13) + composition/prix/remboursement**
+
+---
+
+**Fin du résumé - Version 2.0.0 - 4 Février 2026**

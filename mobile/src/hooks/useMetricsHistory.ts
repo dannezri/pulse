@@ -46,7 +46,8 @@ interface MetricsHistory {
 
 async function fetchMetricsHistory(
   userId: string | null,
-  days: number = 30
+  days?: number,
+  specificDate?: Date
 ): Promise<MetricsHistory> {
   if (!userId) {
     return {
@@ -60,11 +61,25 @@ async function fetchMetricsHistory(
     };
   }
 
-  // Calculate start date
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  let startDate: Date;
+  let endDate: Date;
 
-  console.log('[useMetricsHistory] Fetching metrics from', startDate.toISOString());
+  if (specificDate) {
+    // Mode jour spécifique : récupérer les données pour ce jour uniquement
+    startDate = new Date(specificDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(specificDate);
+    endDate.setHours(23, 59, 59, 999);
+    console.log('[useMetricsHistory] Fetching metrics for specific day:', startDate.toISOString());
+  } else {
+    // Mode période : récupérer les données pour les X derniers jours
+    const daysToFetch = days || 30;
+    startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysToFetch);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(); // Maintenant
+    console.log('[useMetricsHistory] Fetching metrics from', startDate.toISOString(), 'to', endDate.toISOString());
+  }
 
   // Fetch all biometrics for the period
   const { data: biometrics, error } = await supabase
@@ -72,6 +87,7 @@ async function fetchMetricsHistory(
     .select('metric_type, value, recorded_at, source')
     .eq('user_id', userId)
     .gte('recorded_at', startDate.toISOString())
+    .lte('recorded_at', endDate.toISOString())
     .order('recorded_at', { ascending: true });
 
   if (error) {
@@ -96,39 +112,55 @@ async function fetchMetricsHistory(
     return groupedMetrics;
   }
 
-  // Group by date and metric_type, keeping the latest value for each day
-  const dataByDateAndType: Record<string, Record<string, MetricDataPoint>> = {};
-
-  biometrics.forEach((record) => {
-    const date = new Date(record.recorded_at).toISOString().split('T')[0];
-    const metricType = record.metric_type;
-
-    if (!dataByDateAndType[date]) {
-      dataByDateAndType[date] = {};
-    }
-
-    // Keep the latest value for this date and metric
-    if (
-      !dataByDateAndType[date][metricType] ||
-      new Date(record.recorded_at) >
-        new Date(dataByDateAndType[date][metricType].date)
-    ) {
-      dataByDateAndType[date][metricType] = {
-        date: record.recorded_at,
-        value: record.value,
-        source: record.source,
-      };
-    }
-  });
-
-  // Convert to arrays
-  Object.values(dataByDateAndType).forEach((dayData) => {
-    Object.entries(dayData).forEach(([metricType, dataPoint]) => {
+  // Pour un jour spécifique, garder toutes les mesures de la journée
+  // Pour une période, garder une mesure par jour (la plus récente)
+  if (specificDate) {
+    // Mode jour : garder toutes les mesures
+    biometrics.forEach((record) => {
+      const metricType = record.metric_type;
       if (metricType in groupedMetrics) {
-        (groupedMetrics as any)[metricType].push(dataPoint);
+        (groupedMetrics as any)[metricType].push({
+          date: record.recorded_at,
+          value: record.value,
+          source: record.source,
+        });
       }
     });
-  });
+  } else {
+    // Mode période : une mesure par jour
+    const dataByDateAndType: Record<string, Record<string, MetricDataPoint>> = {};
+
+    biometrics.forEach((record) => {
+      const date = new Date(record.recorded_at).toISOString().split('T')[0];
+      const metricType = record.metric_type;
+
+      if (!dataByDateAndType[date]) {
+        dataByDateAndType[date] = {};
+      }
+
+      // Keep the latest value for this date and metric
+      if (
+        !dataByDateAndType[date][metricType] ||
+        new Date(record.recorded_at) >
+          new Date(dataByDateAndType[date][metricType].date)
+      ) {
+        dataByDateAndType[date][metricType] = {
+          date: record.recorded_at,
+          value: record.value,
+          source: record.source,
+        };
+      }
+    });
+
+    // Convert to arrays
+    Object.values(dataByDateAndType).forEach((dayData) => {
+      Object.entries(dayData).forEach(([metricType, dataPoint]) => {
+        if (metricType in groupedMetrics) {
+          (groupedMetrics as any)[metricType].push(dataPoint);
+        }
+      });
+    });
+  }
 
   // Sort each array by date
   Object.keys(groupedMetrics).forEach((key) => {
@@ -148,10 +180,14 @@ async function fetchMetricsHistory(
   return groupedMetrics;
 }
 
-export function useMetricsHistory(userId: string | null, days: number = 30) {
+export function useMetricsHistory(
+  userId: string | null, 
+  days?: number,
+  specificDate?: Date
+) {
   return useQuery({
-    queryKey: ['metricsHistory', userId, days],
-    queryFn: () => fetchMetricsHistory(userId, days),
+    queryKey: ['metricsHistory', userId, days, specificDate?.toISOString()],
+    queryFn: () => fetchMetricsHistory(userId, days, specificDate),
     enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes

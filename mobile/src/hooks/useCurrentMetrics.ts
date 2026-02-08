@@ -46,17 +46,19 @@ async function fetchCurrentMetrics(userId: string | null): Promise<CurrentMetric
     };
   }
 
-  // Get today's date
+  // Get today's date range (from midnight to current time)
   const today = new Date().toISOString().split('T')[0];
+  const now = new Date().toISOString();
 
-  console.log('[useCurrentMetrics] Fetching metrics for date:', today);
+  console.log('[useCurrentMetrics] Fetching metrics for date:', today, 'up to', now);
 
-  // Fetch latest biometrics for today
+  // Fetch latest biometrics for today, explicitly including up to current time
   const { data: biometrics, error } = await supabase
     .from('biometrics')
     .select('*')
     .eq('user_id', userId)
     .gte('recorded_at', `${today}T00:00:00.000Z`)
+    .lte('recorded_at', now) // Explicitly include up to current time
     .order('recorded_at', { ascending: false });
 
   if (error) {
@@ -78,8 +80,9 @@ async function fetchCurrentMetrics(userId: string | null): Promise<CurrentMetric
     floors_climbed: getValue('floors_climbed'),
     
     // Vitals
+    // Note: Oura stocke 'hr' pas 'heart_rate'
     hrv: getValue('hrv'),
-    hr: getValue('heart_rate'),
+    hr: getValue('hr') || getValue('heart_rate'), // Essayer 'hr' d'abord (Oura), puis 'heart_rate'
     spo2: getValue('spo2'),
     glucose: getValue('glucose'),
     respiratory_rate: getValue('respiratory_rate'),

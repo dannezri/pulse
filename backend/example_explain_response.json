@@ -1,0 +1,62 @@
+{
+  "energyScore": 38,
+  "confidence": 62,
+  "label": "Journée fragile",
+  "date": "2026-02-01",
+  "cards": [
+    {
+      "type": "nervous",
+      "title": "Le câblage est saturé",
+      "text": "Ton HRV est tombé à 20ms (baseline: 30ms). Ton système nerveux parasympathique ne récupère plus efficacement. C'est lui qui gère la régénération nocturne.",
+      "analogy": "C'est comme charger ton téléphone avec un câble sectionné : l'énergie ne passe plus correctement.",
+      "metrics": {
+        "primary": {
+          "label": "HRV actuel",
+          "value": 20,
+          "unit": "ms"
+        },
+        "secondary": {
+          "label": "HRV baseline",
+          "value": 30,
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "type": "chemistry",
+      "title": "Réservoir plein, moteur bridé",
+      "text": "Ton sommeil est correct (81/100), mais tes médicaments (68% d'impact) empêchent ton corps d'utiliser cette récupération pleinement.",
+      "analogy": "Tu as fait le plein d'essence, mais ton moteur a un limiteur de vitesse actif.",
+      "metrics": {
+        "primary": {
+          "label": "Impact total",
+          "value": 68,
+          "unit": "%"
+        },
+        "secondary": {
+          "label": "Score sommeil",
+          "value": 81,
+          "unit": "/100"
+        }
+      }
+    },
+    {
+      "type": "load",
+      "title": "Le coût de l'oxygène",
+      "text": "Tes sinus obstrués forcent ton corps à dépenser de l'énergie supplémentaire juste pour maintenir une oxygénation correcte, augmentant ton RHR de repos.",
+      "analogy": "C'est comme courir avec un sac à dos invisible toute la journée.",
+      "metrics": {
+        "primary": {
+          "label": "RHR actuel",
+          "value": 65,
+          "unit": "bpm"
+        },
+        "secondary": {
+          "label": "RHR baseline",
+          "value": 63,
+          "unit": "bpm"
+        }
+      }
+    }
+  ]
+}

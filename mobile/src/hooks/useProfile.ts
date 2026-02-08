@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 interface Profile {
   id: string;
   full_name: string | null;
-  health_goal: string | null;
   baseline_hrv: number | null;
   baseline_resting_hr: number | null;
   open_wearables_user_id: string | null;
@@ -17,7 +16,7 @@ async function fetchProfile(userId: string | null): Promise<Profile | null> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, health_goal, baseline_hrv, baseline_resting_hr, open_wearables_user_id, created_at, updated_at')
+    .select('id, full_name, baseline_hrv, baseline_resting_hr, open_wearables_user_id, created_at, updated_at')
     .eq('id', userId)
     .single();
 

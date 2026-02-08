@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "Pulse",
+    "slug": "pulse-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "extra": {
+      "eas": {
+        "projectId": ""
+      },
+      "supabaseUrl": "https://khhcywhnhncwcevleclh.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaGN5d2huaG5jd2NldmxlY2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNTM5ODIsImV4cCI6MjA4NDkyOTk4Mn0.Hx3rE7n81ZhNYsFeA_-Pglk-RozaovAzjRgphO5Mpmo",
+      "vitalRegion": "us",
+      "vitalEnvironment": "sandbox",
+      "backendUrl": "http://192.168.0.23:9000",
+      "devUserUuid": "bee9a055-9b10-47d7-b91d-d7f6081a63f1"
+    },
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dannezri.pulse"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.dannezri.pulse"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "scheme": "pulse",
+    "plugins": [
+      "expo-router",
+      [
+        "./pulse-healthkit/app.plugin.js",
+        {
+          "healthShareUsageDescription": "Pulse a besoin d'accéder à vos données de santé pour générer des insights personnalisés sur votre bien-être.",
+          "healthUpdateUsageDescription": "Pulse lit uniquement vos données de santé, aucune modification n'est effectuée."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "L'application a besoin d'accéder à votre calendrier pour afficher vos événements à venir."
+        }
+      ],
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

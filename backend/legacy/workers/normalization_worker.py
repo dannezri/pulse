@@ -4,12 +4,17 @@ Worker Celery pour normaliser les données webhook et mettre à jour les profils
 
 from typing import Dict, Optional
 import logging
+import sys
 from datetime import datetime
-from job_queue import celery_app
-from supabase_client import SupabaseClient
-from data_normalizer import DataNormalizer
 import os
 from dotenv import load_dotenv
+
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from job_queue import celery_app
+from supabase_client import SupabaseClient
+from legacy.data_normalizer import DataNormalizer
 
 load_dotenv()
 

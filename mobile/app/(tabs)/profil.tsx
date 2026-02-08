@@ -9,21 +9,12 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useHealthData } from '@/src/hooks/useHealthData';
-import { storage } from '@/src/lib/storage';
-import { User, Mail, Target, Watch, CheckCircle2, LogOut } from 'lucide-react-native';
-
-type HealthGoal = 'energy' | 'focus' | 'recovery';
-
-const HEALTH_GOAL_LABELS: Record<HealthGoal, string> = {
-  energy: 'Energy',
-  focus: 'Focus',
-  recovery: 'Recovery',
-};
+import { useHealthData } from '@/hooks/useHealthData';
+import { storage } from '@/lib/storage';
+import { ChevronLeft, MoreVertical, Target, User as UserIcon, Settings as SettingsIcon, TrendingUp, Heart, Pill } from 'lucide-react-native';
 
 export default function ProfilScreen() {
-  const { userProfile, loadingUserProfile, fetchUserProfile, updateHealthGoal } = useHealthData();
-  const [updating, setUpdating] = useState(false);
+  const { userProfile, loadingUserProfile, fetchUserProfile } = useHealthData();
   const [signingOut, setSigningOut] = useState(false);
 
   // Load profile on mount
@@ -31,16 +22,6 @@ export default function ProfilScreen() {
     fetchUserProfile();
   }, [fetchUserProfile]);
 
-  const handleUpdateGoal = async (newGoal: HealthGoal) => {
-    if (updating || !userProfile) return;
-
-    setUpdating(true);
-    const success = await updateHealthGoal(newGoal);
-    if (!success) {
-      console.error('Failed to update health goal');
-    }
-    setUpdating(false);
-  };
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -77,148 +58,165 @@ export default function ProfilScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#34C759" />
+          <ActivityIndicator size="large" color="#7B6CF6" />
         </View>
       </View>
     );
   }
 
-  const isWearableConnected = !!userProfile?.open_wearables_user_id;
-  const currentGoal = (userProfile?.health_goal as HealthGoal) || 'energy';
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Profil</Text>
-      </View>
-
-      {/* Info Utilisateur */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <User size={20} color="#FFFFFF" />
-          <Text style={styles.sectionTitle}>Informations</Text>
-        </View>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nom</Text>
-            <Text style={styles.infoValue}>{userProfile?.full_name || 'Non défini'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Mail size={16} color="#8E8E93" />
-            <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>Utilisateur connecté</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Objectif Santé */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Target size={20} color="#FFFFFF" />
-          <Text style={styles.sectionTitle}>Objectif Santé</Text>
-        </View>
-        <View style={styles.goalCard}>
-          <Text style={styles.goalDescription}>
-            Sélectionnez votre objectif principal. L'IA adaptera ses conseils en conséquence.
-          </Text>
-          <View style={styles.goalOptions}>
-            {(['energy', 'focus', 'recovery'] as HealthGoal[]).map((goal) => (
-              <TouchableOpacity
-                key={goal}
-                style={[
-                  styles.goalOption,
-                  currentGoal === goal && styles.goalOptionActive,
-                  updating && styles.goalOptionDisabled,
-                ]}
-                onPress={() => handleUpdateGoal(goal)}
-                disabled={updating}
-              >
-                <Text
-                  style={[
-                    styles.goalOptionText,
-                    currentGoal === goal && styles.goalOptionTextActive,
-                  ]}
-                >
-                  {HEALTH_GOAL_LABELS[goal]}
-                </Text>
-                {currentGoal === goal && (
-                  <CheckCircle2 size={18} color="#34C759" style={styles.checkIcon} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-          {updating && (
-            <View style={styles.updatingIndicator}>
-              <ActivityIndicator size="small" color="#34C759" />
-              <Text style={styles.updatingText}>Mise à jour...</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Statut Connexion Wearable */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Watch size={20} color="#FFFFFF" />
-          <Text style={styles.sectionTitle}>Wearable</Text>
-        </View>
-        <View style={styles.wearableCard}>
-          <View style={styles.wearableStatus}>
-            {isWearableConnected ? (
-              <>
-                <CheckCircle2 size={24} color="#34C759" />
-                <View style={styles.wearableInfo}>
-                  <Text style={styles.wearableStatusText}>Connecté</Text>
-                  <Text style={styles.wearableStatusSubtext}>
-                    Vos données sont synchronisées
-                  </Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={styles.wearableIconPlaceholder} />
-                <View style={styles.wearableInfo}>
-                  <Text style={styles.wearableStatusText}>Non connecté</Text>
-                  <Text style={styles.wearableStatusSubtext}>
-                    Connectez un wearable pour commencer
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Bouton Déconnexion */}
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={[styles.logoutButton, signingOut && styles.logoutButtonDisabled]}
-          onPress={handleSignOut}
-          disabled={signingOut}
+        <TouchableOpacity style={styles.headerButton}>
+          <ChevronLeft size={28} color="#FFFFFF" strokeWidth={2.5} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Account</Text>
+        <TouchableOpacity 
+          style={styles.headerButton}
+          onPress={() => router.push('/profil-old')}
         >
-          {signingOut ? (
-            <ActivityIndicator size="small" color="#FF3B30" />
-          ) : (
-            <LogOut size={20} color="#FF3B30" />
-          )}
-          <Text style={styles.logoutButtonText}>
-            {signingOut ? 'Déconnexion...' : 'Déconnexion'}
-          </Text>
+          <MoreVertical size={28} color="#FFFFFF" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Badge comparaison */}
+        <View style={styles.comparisonBadge}>
+          <Text style={styles.comparisonText}>🆕 Nouvelle version</Text>
+          <TouchableOpacity 
+            style={styles.comparisonButton}
+            onPress={() => router.push('/profil-old')}
+          >
+            <Text style={styles.comparisonButtonText}>Voir ancienne version →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Avatar & Name */}
+        <View style={styles.profileSection}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              {/* Simple avatar with initials */}
+              <Text style={styles.avatarText}>
+                {userProfile?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'U'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.userName}>{userProfile?.full_name || 'Utilisateur'}</Text>
+          <View style={styles.proBadge}>
+            <Text style={styles.proText}>Pro</Text>
+          </View>
+        </View>
+
+        {/* Menu Items */}
+        <View style={styles.menuContainer}>
+          {/* Goals */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/goals')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#FF6B35' }]}>
+              <Target size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>Goals</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+
+          {/* My Body */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/my-body')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#FF6B9D' }]}>
+              <UserIcon size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>My Body</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+
+          {/* Settings */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#4ECDC4' }]}>
+              <SettingsIcon size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>Settings</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+
+          {/* Normalisation */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/baselines')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#7B6CF6' }]}>
+              <TrendingUp size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>Normalisation</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+
+          {/* Conditions de santé */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/health-conditions')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#FF2D55' }]}>
+              <Heart size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>Conditions de santé</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+
+          {/* Médicaments */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/medications')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: '#5E5CE6' }]}>
+              <Pill size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={styles.menuText}>Médicaments</Text>
+            <View style={styles.menuArrow} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign Out Button */}
+        <View style={styles.signOutContainer}>
+          <TouchableOpacity
+            style={[styles.signOutButton, signingOut && styles.signOutButtonDisabled]}
+            onPress={handleSignOut}
+            disabled={signingOut}
+            activeOpacity={0.8}
+          >
+            {signingOut ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.signOutText}>Sign Out</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-  },
-  contentContainer: {
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: '#0D0D1F',
   },
   loadingContainer: {
     flex: 1,
@@ -226,155 +224,158 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  infoCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '500',
-    minWidth: 80,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    flex: 1,
-  },
-  goalCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-  },
-  goalDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  goalOptions: {
-    gap: 12,
-  },
-  goalOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2C2C2E',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#0D0D1F',
   },
-  goalOptionActive: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#34C759',
-  },
-  goalOptionDisabled: {
-    opacity: 0.5,
-  },
-  goalOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8E8E93',
-  },
-  goalOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  checkIcon: {
-    marginLeft: 'auto',
-  },
-  updatingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  updatingText: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  wearableCard: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
-  },
-  wearableStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  wearableIconPlaceholder: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#2C2C2E',
-  },
-  wearableInfo: {
+  scrollView: {
     flex: 1,
   },
-  wearableStatusText: {
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 4,
+    letterSpacing: 0.3,
   },
-  wearableStatusSubtext: {
+  comparisonBadge: {
+    backgroundColor: '#7B6CF620',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#7B6CF640',
+  },
+  comparisonText: {
     fontSize: 14,
-    color: '#8E8E93',
+    fontWeight: '700',
+    color: '#7B6CF6',
+    marginBottom: 8,
+    letterSpacing: 0.3,
   },
-  logoutButton: {
+  comparisonButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-    gap: 12,
   },
-  logoutButtonDisabled: {
+  comparisonButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  profileSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  avatarContainer: {
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#7B6CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF15',
+  },
+  avatarText: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    letterSpacing: 0.3,
+  },
+  proBadge: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  proText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  menuContainer: {
+    paddingHorizontal: 20,
+    gap: 0,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#1A1A2E',
+    marginBottom: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FFFFFF10',
+  },
+  menuIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  menuText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+    letterSpacing: 0.2,
+  },
+  menuArrow: {
+    width: 8,
+    height: 8,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: '#FFFFFF60',
+    transform: [{ rotate: '45deg' }],
+  },
+  signOutContainer: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+    paddingBottom: 20,
+  },
+  signOutButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF20',
+  },
+  signOutButtonDisabled: {
     opacity: 0.5,
   },
-  logoutButtonText: {
-    fontSize: 16,
+  signOutText: {
+    fontSize: 17,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

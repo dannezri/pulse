@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/src/lib/supabase';
-import { storage } from '@/src/lib/storage';
+import { supabase } from '@/lib/supabase';
+import { storage } from '@/lib/storage';
 
 // Types
 export interface Insight {
@@ -43,7 +43,6 @@ export interface HealthProfile {
 export interface UserProfile {
   id: string;
   full_name: string | null;
-  health_goal: string;
   open_wearables_user_id: string | null;
   baseline_hrv: number | null;
   baseline_resting_hr: number | null;
@@ -68,9 +67,6 @@ export interface UseHealthDataReturn {
   fetchTrends: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
   refreshAll: () => Promise<void>;
-  
-  // Update functions
-  updateHealthGoal: (newGoal: string) => Promise<boolean>;
 }
 
 export function useHealthData(): UseHealthDataReturn {
@@ -260,34 +256,6 @@ export function useHealthData(): UseHealthDataReturn {
     ]);
   }, [fetchLatestInsight, fetchHealthProfile, fetchTrends, fetchUserProfile]);
 
-  // Update health goal
-  const updateHealthGoal = useCallback(async (newGoal: string): Promise<boolean> => {
-    try {
-      const userId = await storage.getUserId();
-      if (!userId) {
-        console.error('No user ID found, cannot update health goal');
-        return false;
-      }
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ health_goal: newGoal })
-        .eq('id', userId);
-
-      if (error) {
-        console.error('Error updating health goal:', error);
-        return false;
-      }
-
-      // Refresh user profile after update
-      await fetchUserProfile();
-      return true;
-    } catch (error) {
-      console.error('Exception updating health goal:', error);
-      return false;
-    }
-  }, [fetchUserProfile]);
-
   // Real-time subscription for insights
   useEffect(() => {
     let channel: any = null;
@@ -346,8 +314,5 @@ export function useHealthData(): UseHealthDataReturn {
     fetchTrends,
     fetchUserProfile,
     refreshAll,
-    
-    // Update functions
-    updateHealthGoal,
   };
 }

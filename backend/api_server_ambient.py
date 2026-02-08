@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, HTTPException, Header
 from typing import Optional
 import os
 import logging
+import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -25,6 +26,7 @@ from supabase_client import SupabaseClient
 from correlation_engine import CorrelationEngine
 from llm_client import LLMClient
 from priority_engine import PriorityEngine
+from services.ai_service import AIAnalysisService
 
 app = FastAPI(title="Pulse - Ambient Concierge API")
 
@@ -43,6 +45,12 @@ correlation_engine = CorrelationEngine(
 
 # Priority Engine pour l'interface Ambient Concierge
 priority_engine = PriorityEngine(supabase_client=supabase_client)
+
+# AI Analysis Service pour le Smart Cache
+ai_service = AIAnalysisService(
+    supabase_client=supabase_client,
+    llm_client=llm_client
+)
 
 
 @app.get("/")
@@ -239,6 +247,171 @@ async def get_latest_insight(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/v1/analyze-event")
+async def analyze_event(request: Request):
+    """
+    Analyse IA d'un événement du calendrier avec Smart Cache
+    
+    Body:
+    {
+        "user_id": "uuid",
+        "event": {
+            "title": "Réunion",
+            "start": "2024-01-15T10:00:00Z",
+            "end": "2024-01-15T11:00:00Z",
+            "location": "Bureau",
+            "notes": "..."
+        },
+        "force_refresh": false
+    }
+    
+    Retourne:
+    {
+        "status": "success",
+        "insight": "# Diagnostic Flash...",
+        "cached": false,
+        "analyzed_at": "2024-01-15T09:30:00Z",
+        "biometrics_ref_at": "2024-01-15T09:25:00Z"
+    }
+    
+    Logique de Smart Cache :
+    - Si force_refresh=False ET insight existe ET pas de nouvelles données biométriques
+      → Retourne le cache (instantané, 0€)
+    - Sinon → Appel OpenAI et sauvegarde (quelques secondes, ~0.01€)
+    """
+    try:
+        payload = await request.json()
+        
+        # Validation
+        user_id = payload.get("user_id")
+        event_data = payload.get("event", {})
+        force_refresh = payload.get("force_refresh", False)
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        if not event_data.get("title") or not event_data.get("start"):
+            raise HTTPException(status_code=400, detail="event.title and event.start are required")
+        
+        logger.info(f"[analyze-event] user={user_id}, event={event_data.get('title')}, force={force_refresh}")
+        
+        # Timeout de 15 secondes pour éviter blocage
+        try:
+            # Appel synchrone dans un executor pour éviter de bloquer
+            result = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None,
+                    ai_service.analyze_event,
+                    user_id,
+                    event_data,
+                    force_refresh
+                ),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"[analyze-event] Timeout après 15 secondes pour user {user_id}")
+            raise HTTPException(
+                status_code=504,
+                detail="L'analyse a pris trop de temps. Réessayez dans quelques instants."
+            )
+        
+        # Si erreur dans le service, retourner 500
+        if result.get("status") == "error":
+            raise HTTPException(status_code=500, detail=result.get("message", "Unknown error"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[analyze-event] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/generate-brief")
+async def generate_brief(request: Request):
+    """
+    Génère le Brief quotidien avec le Wellness Coach IA
+    
+    Body:
+    {
+        "user_id": "uuid",
+        "force_refresh": false
+    }
+    
+    Retourne:
+    {
+        "status": "success",
+        "cards": [
+            {
+                "id": "verdict",
+                "type": "verdict",
+                "title": "Le bilan du coach",
+                "content": "Message en Markdown...",
+                "state": "optimal" | "warning" | "alert" | "neutral",
+                "iconName": "Activity",
+                "badge": 58,
+                "priority": 100,
+                "actionButton": {
+                    "label": "Voir détails",
+                    "action": "view_details"
+                }
+            }
+        ],
+        "pulseScore": 58,
+        "cached": false,
+        "analyzed_at": "2024-01-15T09:30:00Z"
+    }
+    
+    Logique de Smart Cache :
+    - Si force_refresh=False ET brief existe pour aujourd'hui ET pas de nouvelles données biométriques
+      → Retourne le cache (instantané, 0€)
+    - Sinon → Appel OpenAI et sauvegarde (quelques secondes, ~0.01€)
+    """
+    try:
+        payload = await request.json()
+        
+        # Validation
+        user_id = payload.get("user_id")
+        force_refresh = payload.get("force_refresh", False)
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        logger.info(f"[generate-brief] user={user_id}, force={force_refresh}")
+        
+        # Timeout de 45 secondes pour le Brief complet (incluant appel OpenAI)
+        try:
+            # Appel synchrone dans un executor pour éviter de bloquer
+            result = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None,
+                    ai_service.generate_brief,
+                    user_id,
+                    force_refresh
+                ),
+                timeout=45.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"[generate-brief] Timeout après 45 secondes pour user {user_id}")
+            raise HTTPException(
+                status_code=504,
+                detail="La génération du Brief a pris trop de temps (>45s). Réessayez dans quelques instants."
+            )
+        
+        # Si erreur dans le service, retourner 500
+        if result.get("status") == "error":
+            raise HTTPException(status_code=500, detail=result.get("message", "Unknown error"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[generate-brief] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health-profile/{user_id}")
 async def get_health_profile(user_id: str):
     """
@@ -385,6 +558,7 @@ if __name__ == "__main__":
     print(f"   - GET  /api/baselines/{{user_id}}")
     print(f"   - POST /api/insights/prioritized")
     print(f"   - GET  /api/insights/latest")
+    print(f"   - POST /api/v1/analyze-event  🆕 Smart Cache")
     print(f"   - GET  /health-profile/{{user_id}}")
     print(f"   - POST /api/webhooks/vital")
     uvicorn.run(app, host="0.0.0.0", port=port)

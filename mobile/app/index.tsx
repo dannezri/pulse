@@ -3,9 +3,17 @@ import { useRouter, useSegments } from "expo-router";
 import { View, Text, ActivityIndicator, Platform } from "react-native";
 import { supabase } from "../src/lib/supabase";
 import { storage } from "../src/lib/storage";
+import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
-// ID de développement pour auto-login
-const DEV_OPEN_WEARABLES_ID = "a088e712-cb41-4712-b622-af4370baaa20";
+// UUID de développement pour auto-login (depuis .env ou variable d'environnement)
+// Pour le définir : ajouter EXPO_PUBLIC_DEV_USER_UUID dans mobile/.env
+console.log('🔍 UUID Debug:', {
+  fromExpoConfig: Constants.expoConfig?.extra?.devUserUuid,
+  fromEnv: process.env.EXPO_PUBLIC_DEV_USER_UUID,
+  allExtra: Constants.expoConfig?.extra
+});
+const DEV_USER_UUID = Constants.expoConfig?.extra?.devUserUuid || process.env.EXPO_PUBLIC_DEV_USER_UUID;
 
 export default function Index() {
   const router = useRouter();
@@ -27,39 +35,67 @@ export default function Index() {
       }
 
       try {
+        // Vérifier si DEV_USER_UUID est configuré
+        if (!DEV_USER_UUID) {
+          console.error("❌ DEV_USER_UUID non configuré. Ajoutez EXPO_PUBLIC_DEV_USER_UUID dans mobile/.env");
+          setError("UUID de développement non configuré");
+          setLoading(false);
+          return;
+        }
+
         // Vérifier si un utilisateur est déjà connecté (via storage local)
         const userId = await storage.getUserId();
         
-        if (userId) {
-          // Utilisateur déjà connecté
-          console.log("Utilisateur déjà connecté:", userId);
+        // Si l'UUID stocké est différent de celui en dev, le remplacer
+        if (userId && userId !== DEV_USER_UUID) {
+          console.log("⚠️ UUID différent détecté, mise à jour:", userId, "→", DEV_USER_UUID);
+          
+          // Vider le cache des médicaments et autres données utilisateur
+          try {
+            console.log("🗑️ Vidage du cache utilisateur...");
+            await SecureStore.deleteItemAsync('pulse_medications', {
+              keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+            });
+            console.log("✅ Cache des médicaments vidé");
+          } catch (err) {
+            console.warn("⚠️ Erreur lors du vidage du cache:", err);
+          }
+          
+          await storage.saveUserId(DEV_USER_UUID);
+          console.log("✅ UUID mis à jour:", DEV_USER_UUID);
+          router.replace("/(tabs)");
+          setLoading(false);
+          return;
+        }
+        
+        if (userId === DEV_USER_UUID) {
+          // Utilisateur déjà connecté avec le bon UUID
+          console.log("✅ Utilisateur déjà connecté:", userId);
           router.replace("/(tabs)");
           setLoading(false);
           return;
         }
 
-        // Auto-login pour le développement
-        console.log("Auto-login avec Open Wearables ID:", DEV_OPEN_WEARABLES_ID);
+        // Aucun utilisateur connecté : Auto-login pour le développement
+        console.log("🔐 Auto-login avec UUID:", DEV_USER_UUID);
         
-        // Récupérer l'UUID Supabase à partir de l'Open Wearables ID
-        const { data: profileData, error: profileError } = await supabase
-          .rpc('get_user_by_open_wearables_id', { open_wearables_id: DEV_OPEN_WEARABLES_ID });
-
-        if (profileError || !profileData || profileData.length === 0) {
-          console.error("Erreur lors de l'auto-login:", profileError);
-          router.replace("/login");
-          setLoading(false);
-          return;
+        // Vider le cache pour partir sur une base propre
+        try {
+          console.log("🗑️ Nettoyage du cache au premier démarrage...");
+          await SecureStore.deleteItemAsync('pulse_medications', {
+            keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+          });
+        } catch (err) {
+          // Ignore si la clé n'existe pas
         }
-
-        // Stocker l'UUID Supabase localement
-        const supabaseUserId = profileData[0].id;
-        await storage.saveUserId(supabaseUserId);
         
-        console.log("Auto-login réussi, UUID:", supabaseUserId);
+        // Stocker l'UUID Supabase localement (pas besoin de RPC)
+        await storage.saveUserId(DEV_USER_UUID);
+        
+        console.log("✅ Auto-login réussi, UUID:", DEV_USER_UUID);
         router.replace("/(tabs)");
       } catch (err) {
-        console.error("Erreur d'initialisation:", err);
+        console.error("❌ Erreur d'initialisation:", err);
         setError(err instanceof Error ? err.message : "Erreur inconnue");
         router.replace("/login");
       } finally {

@@ -322,15 +322,13 @@ class SupabaseClient:
             return []
     
     def get_user_goal(self, user_id: str) -> str:
-        """Récupère l'objectif santé de l'utilisateur"""
-        try:
-            response = self.client.table("profiles").select("health_goal").eq("id", user_id).execute()
-            if response.data:
-                return response.data[0].get("health_goal", "energy")
-            return "energy"
-        except Exception as e:
-            logger.error(f"Error fetching user goal: {e}")
-            return "energy"
+        """Récupère l'objectif santé de l'utilisateur
+        
+        Note: Depuis la migration 022, health_goal a été supprimé.
+        Cette méthode retourne maintenant toujours 'energy' pour compatibilité.
+        """
+        # Toujours retourner 'energy' par défaut maintenant que health_goal est supprimé
+        return "energy"
     
     def save_health_profile(
         self, 

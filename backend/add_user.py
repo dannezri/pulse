@@ -146,11 +146,6 @@ def create_user_interactive():
     # Informations optionnelles
     full_name = input(f"{Colors.YELLOW}Nom complet (optionnel): {Colors.RESET}").strip() or None
     
-    health_goal = input(f"{Colors.YELLOW}Objectif santé (energy/sleep/weight/focus) [energy]: {Colors.RESET}").strip() or "energy"
-    if health_goal not in ["energy", "sleep", "weight", "focus"]:
-        print_info("Objectif invalide, utilisation de 'energy' par défaut")
-        health_goal = "energy"
-    
     # Baselines (optionnelles)
     baseline_hrv_input = input(f"{Colors.YELLOW}Baseline HRV (ms, optionnel): {Colors.RESET}").strip()
     baseline_hrv = int(baseline_hrv_input) if baseline_hrv_input.isdigit() else None
@@ -161,8 +156,7 @@ def create_user_interactive():
     # Préparer les données
     user_data = {
         "id": user_id,
-        "open_wearables_user_id": open_wearables_user_id,
-        "health_goal": health_goal
+        "open_wearables_user_id": open_wearables_user_id
     }
     
     if full_name:
@@ -177,7 +171,6 @@ def create_user_interactive():
     print(f"UUID: {user_id}")
     print(f"Open Wearables ID: {open_wearables_user_id}")
     print(f"Nom: {full_name or 'N/A'}")
-    print(f"Objectif: {health_goal}")
     print(f"Baseline HRV: {baseline_hrv or 'N/A'}")
     print(f"Baseline HR: {baseline_hr or 'N/A'}")
     
@@ -200,7 +193,6 @@ def create_user_interactive():
             print(f"  UUID: {user['id']}")
             print(f"  Open Wearables ID: {user.get('open_wearables_user_id')}")
             print(f"  Nom: {user.get('full_name', 'N/A')}")
-            print(f"  Objectif: {user.get('health_goal', 'energy')}")
             print(f"  Baseline HRV: {user.get('baseline_hrv', 'N/A')}")
             print(f"  Baseline HR: {user.get('baseline_resting_hr', 'N/A')}")
             return True
@@ -269,8 +261,7 @@ def create_user_quick(open_wearables_user_id: str, user_id: str = None, full_nam
     
     user_data = {
         "id": user_id,
-        "open_wearables_user_id": open_wearables_user_id,
-        "health_goal": "energy"
+        "open_wearables_user_id": open_wearables_user_id
     }
     
     if full_name:
@@ -296,7 +287,7 @@ def list_users():
     try:
         client = create_client(supabase_url, supabase_key)
         
-        response = client.table("profiles").select("id, full_name, open_wearables_user_id, health_goal, baseline_hrv, baseline_resting_hr, created_at").order("created_at", desc=True).execute()
+        response = client.table("profiles").select("id, full_name, open_wearables_user_id, baseline_hrv, baseline_resting_hr, created_at").order("created_at", desc=True).execute()
         
         if not response.data:
             print_info("Aucun utilisateur trouvé")
@@ -308,7 +299,6 @@ def list_users():
             print(f"{Colors.BOLD}{i}. {user.get('full_name', 'Sans nom')}{Colors.RESET}")
             print(f"   UUID: {user['id']}")
             print(f"   Open Wearables ID: {user.get('open_wearables_user_id', 'N/A')}")
-            print(f"   Objectif: {user.get('health_goal', 'energy')}")
             print(f"   Baseline HRV: {user.get('baseline_hrv', 'N/A')}")
             print(f"   Baseline HR: {user.get('baseline_resting_hr', 'N/A')}")
             print(f"   Créé le: {user.get('created_at', 'N/A')}")

@@ -19,6 +19,7 @@ async function fetchRecentInsights(
 ): Promise<Insight[]> {
   if (!userId) return [];
 
+  // Récupère les insights les plus récents (incluant ceux créés aujourd'hui)
   const { data, error } = await supabase
     .from('insights')
     .select('*')

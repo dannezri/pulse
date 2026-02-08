@@ -26,17 +26,23 @@ function LoadingScreen() {
   );
 }
 
+function AppContent() {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#000000" },
+      }}
+    />
+  );
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#000000" },
-            }}
-          />
+          <AppContent />
         </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>

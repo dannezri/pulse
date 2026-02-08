@@ -1,286 +1,178 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
-import { useAuth } from "../../src/hooks/useAuth";
-import { useProfile } from "../../src/hooks/useProfile";
-import { useAnomalyDetection } from "../../src/hooks/useAnomalyDetection";
-import { useMainInsight } from "../../src/hooks/useMainInsight";
-import { useShakeRefresh } from "../../src/hooks/useShakeRefresh";
-import { GestureOrbWrapper } from "../../src/components/GestureOrbWrapper";
-import { BottomDrawer } from "../../src/components/BottomDrawer";
-import { AmbientInsightCard, CalmStateCard } from "../../src/components/AmbientInsightCard";
-import { FadeInView } from "../../src/components/FadeInView";
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+/**
+ * Page d'Accueil - Brief Quotidien
+ * 
+ * Cette page affiche le briefing quotidien avec:
+ * - Score Pulse révolutionnaire
+ * - Cartes triées par pertinence
+ * - Animations Smooth Stack
+ * - État vide intelligent
+ */
 
-export default function AmbientHomeScreen() {
+import React from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useAuth } from '../../src/hooks/useAuth';
+import { useProfile } from '../../src/hooks/useProfile';
+import { useBriefData } from '../../src/hooks/useBriefData';
+import { BriefStack } from '../../src/components/BriefStack';
+import { FeedbackBottomSheet } from '../../src/components/FeedbackBottomSheet';
+import { useFeedback } from '../../src/hooks/useFeedback';
+
+export default function HomeScreen() {
   const { userId, loading: authLoading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile(userId);
-  const { anomalies, state, isLoading: anomalyLoading } = useAnomalyDetection(userId);
-  const { data: mainInsight, isLoading: insightLoading } = useMainInsight(userId, anomalies);
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data: briefData, isLoading: briefLoading, refetch } = useBriefData(userId);
   
-  // Hook pour rafraîchir les données avec le shake
-  useShakeRefresh();
+  const [refreshing, setRefreshing] = React.useState(false);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await queryClient.invalidateQueries();
-    setRefreshing(false);
+  // Extraire les données du forecast pour le système ML
+  const forecast = briefData?.intraday_energy_forecast;
+  const currentEnergy = forecast?.current_energy || 0;
+  const systemScore = currentEnergy; // Score système = énergie courante
+
+  // Calculer les heures depuis le réveil (estimation: 8h par défaut)
+  const calculateHoursSinceWake = () => {
+    const now = new Date();
+    const wakeTime = new Date(now);
+    wakeTime.setHours(8, 0, 0, 0); // 8h par défaut
+    
+    if (now < wakeTime) {
+      wakeTime.setDate(wakeTime.getDate() - 1);
+    }
+    
+    return (now.getTime() - wakeTime.getTime()) / (1000 * 60 * 60);
   };
 
-  const firstName = profile?.full_name?.split(" ")[0] || "Utilisateur";
-  
-  // Format date
-  const today = new Date();
-  const formattedDate = today.toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+  // Extraire les facteurs actifs depuis le forecast
+  const extractActiveFactors = () => {
+    if (!forecast?.influencers) return { medications: [], conditions: [] };
+
+    const medications = forecast.influencers
+      .filter((inf: any) => inf.name.startsWith('💊'))
+      .map((inf: any) => {
+        const name = inf.name.replace('💊 ', '');
+        return {
+          atc_code: 'UNKNOWN', // On ne l'a pas directement, mais le backend le récupérera
+          name: name,
+          impact: parseInt(inf.impact) || 0,
+        };
+      });
+
+    const conditions = forecast.influencers
+      .filter((inf: any) => 
+        inf.name.includes('Dépression') || 
+        inf.name.includes('TDAH') || 
+        inf.name.includes('Fatigue')
+      )
+      .map((inf: any) => {
+        const name = inf.name.replace(/^[😔🧠⚡] /, '');
+        return {
+          icd11_code: 'UNKNOWN', // Sera récupéré par le backend
+          name: name,
+          decay_rate: 0,
+          malus: parseInt(inf.impact) || 0,
+        };
+      });
+
+    return { medications, conditions };
+  };
+
+  // Hook de feedback ML
+  const {
+    showFeedbackSheet,
+    feedbackContext,
+    handleSubmitFeedback,
+    closeFeedbackSheet,
+  } = useFeedback({
+    userId,
+    currentEnergy,
+    systemScore,
+    hoursSinceWake: calculateHoursSinceWake(),
+    activeFactors: extractActiveFactors(),
   });
 
-  const isLoading = authLoading || profileLoading || anomalyLoading;
+  // Handler de refresh avec feedback haptique premium
+  const onRefresh = async () => {
+    console.log('[HomeScreen] 🔄 Pull-to-refresh démarré');
+    
+    // Déclencher une vibration satisfaisante au début du refresh
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    setRefreshing(true);
+    console.log('[HomeScreen] 📡 Appel refetch...');
+    await refetch();
+    console.log('[HomeScreen] ✅ Refetch terminé');
+    setRefreshing(false);
+    
+    // Petite vibration de confirmation à la fin du refresh
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
-  // Loading state
-  if (isLoading && !profile) {
+  // Format date
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'Utilisateur';
+
+  // Loading state initial
+  if ((authLoading || profileLoading || briefLoading) && !briefData) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#34C759" />
+          <ActivityIndicator size="large" color="#00FF41" />
+          <Text style={styles.loadingText}>Calcul de votre Brief...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#34C759"
-        />
-      }
-    >
-      {/* Header minimaliste */}
-      <FadeInView delay={0} duration={600} useSpring>
-        <View style={styles.header}>
-          <Text style={styles.date}>{formattedDate}</Text>
-          <Text style={styles.greeting}>Bonjour {firstName}</Text>
-        </View>
-      </FadeInView>
-
-      {/* GestureOrbWrapper avec Orb organique */}
-      <FadeInView delay={150} duration={800} useSpring>
-        <View style={styles.orbContainer}>
-          <GestureOrbWrapper 
-            state={state} 
-            size={150}
-            onTap={() => setDrawerOpen(true)}
-            onPinch={() => router.push('/details')}
-          />
-        </View>
-      </FadeInView>
-
-      {/* Message d'état sous l'Orb */}
-      <FadeInView delay={300} duration={600} useSpring>
-        <View style={styles.stateMessageContainer}>
-          <Text style={styles.stateMessage}>
-            {state === 'calm' && "Système nerveux en équilibre"}
-            {state === 'warning' && "Attention requise"}
-            {state === 'alert' && "Repos recommandé"}
-          </Text>
-        </View>
-      </FadeInView>
-
-      {/* Carte Insight unique ou Calm State */}
-      <FadeInView delay={450} duration={600} useSpring>
-        {insightLoading ? (
-          <View style={styles.insightLoading}>
-            <ActivityIndicator size="small" color="#8E8E93" />
-            <Text style={styles.insightLoadingText}>Analyse en cours...</Text>
-          </View>
-        ) : anomalies.length > 0 && mainInsight ? (
-          <AmbientInsightCard
-            insight={mainInsight.content}
-            state={state}
-            anomalies={anomalies}
-            onTapForDetails={() => router.push('/details')}
-          />
-        ) : (
-          <CalmStateCard message={mainInsight?.content} />
-        )}
-      </FadeInView>
-
-      {/* Timeline de pertinence (optionnel) */}
-      {anomalies.length > 0 && (
-        <FadeInView delay={600} duration={600} useSpring>
-          <View style={styles.anomalyTimeline}>
-            <Text style={styles.timelineTitle}>Métriques surveillées</Text>
-            {anomalies.slice(0, 3).map((anomaly, index) => (
-              <View key={anomaly.metric} style={styles.anomalyItem}>
-                <View style={styles.anomalyDot} />
-                <View style={styles.anomalyContent}>
-                  <Text style={styles.anomalyMetric}>
-                    {getMetricDisplayName(anomaly.metric)}
-                  </Text>
-                  <Text style={styles.anomalyValue}>
-                    {anomaly.value} ({anomaly.direction === 'above' ? '↑' : '↓'} {Math.abs(anomaly.z_score)}σ)
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </FadeInView>
-      )}
-
-      {/* Spacer pour ne pas coller au bas */}
-      <View style={styles.bottomSpacer} />
-      
-      {/* Bottom Drawer glassmorphique */}
-      <BottomDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        anomalies={anomalies}
-        insight={mainInsight?.content || "Analyse en cours..."}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Stack de cartes plein écran avec animations */}
+      <BriefStack
+        cards={briefData?.cards || []}
+        pulseScore={briefData?.pulseScore || 0}
+        loading={briefLoading}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
       />
-    </ScrollView>
-  );
-}
 
-/**
- * Helper pour afficher des noms de métriques lisibles
- */
-function getMetricDisplayName(metric: string): string {
-  const names: Record<string, string> = {
-    hrv: "Variabilité cardiaque",
-    heart_rate: "Fréquence cardiaque",
-    body_temperature: "Température corporelle",
-    sleep_duration: "Durée de sommeil",
-    sleep: "Sommeil",
-    stress: "Niveau de stress",
-    glucose: "Glycémie",
-    spo2: "Oxygénation",
-    steps: "Nombre de pas",
-    calories: "Calories",
-    water: "Hydratation",
-    active_calories: "Calories actives",
-    weight: "Poids",
-    respiratory_rate: "Fréquence respiratoire",
-    caffeine: "Caféine",
-    distance: "Distance parcourue",
-    floors_climbed: "Étages montés",
-  };
-  return names[metric] || metric;
+      {/* Feedback ML Adaptatif */}
+      <FeedbackBottomSheet
+        isVisible={showFeedbackSheet}
+        onClose={closeFeedbackSheet}
+        systemScore={systemScore}
+        currentEnergy={currentEnergy}
+        hoursSinceWake={calculateHoursSinceWake()}
+        activeFactors={extractActiveFactors()}
+        onSubmit={handleSubmitFeedback}
+        feedbackContext={feedbackContext}
+      />
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
-  },
-  contentContainer: {
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: '#000000',
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#000000',
   },
-  header: {
-    marginBottom: 32,
-  },
-  date: {
-    fontSize: 14,
-    color: "#8E8E93",
-    fontWeight: "500",
-    marginBottom: 4,
-    textTransform: "capitalize",
-  },
-  greeting: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  orbContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 40,
-  },
-  stateMessageContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  stateMessage: {
+  loadingText: {
+    color: '#8E8E93',
     fontSize: 16,
-    color: "#8E8E93",
-    fontWeight: "600",
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
-  },
-  insightLoading: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  insightLoadingText: {
-    color: "#8E8E93",
-    fontSize: 14,
-    marginTop: 12,
-  },
-  anomalyTimeline: {
-    marginTop: 24,
-    backgroundColor: "#1C1C1E",
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#2C2C2E",
-  },
-  timelineTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#8E8E93",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 16,
-  },
-  anomalyItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  anomalyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FF9500",
-    marginRight: 12,
-  },
-  anomalyContent: {
-    flex: 1,
-  },
-  anomalyMetric: {
-    fontSize: 15,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  anomalyValue: {
-    fontSize: 13,
-    color: "#8E8E93",
-  },
-  bottomSpacer: {
-    height: 40,
+    fontWeight: '600',
+    marginTop: 16,
   },
 });

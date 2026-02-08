@@ -13,7 +13,8 @@
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaGN5d2huaG5jd2NldmxlY2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNTM5ODIsImV4cCI6MjA4NDkyOTk4Mn0.Hx3rE7n81ZhNYsFeA_-Pglk-RozaovAzjRgphO5Mpmo",
       "vitalRegion": "us",
       "vitalEnvironment": "sandbox",
-      "backendUrl": "http://192.168.0.23:9000"
+      "backendUrl": "http://192.168.0.23:9000",
+      "devUserUuid": "c559fcd7-f6a6-4a4d-8036-c9c9d8b8c7bd"
     },
     "userInterfaceStyle": "dark",
     "splash": {
@@ -26,14 +27,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dannezri.pulse"
+      "bundleIdentifier": "com.dannezri.pulse2026"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.dannezri.pulse"
+      "package": "com.dannezri.pulse2026"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -45,11 +46,25 @@
       [
         "./pulse-healthkit/app.plugin.js",
         {
-          "healthShareUsageDescription": "Pulse a besoin d'accéder à vos données de santé pour générer des insights personnalisés sur votre bien-être.",
-          "healthUpdateUsageDescription": "Pulse lit uniquement vos données de santé, aucune modification n'est effectuée."
+          "healthShareUsageDescription": "Pulse a besoin d'acc\u00e9der \u00e0 vos donn\u00e9es de sant\u00e9 pour g\u00e9n\u00e9rer des insights personnalis\u00e9s sur votre bien-\u00eatre.",
+          "healthUpdateUsageDescription": "Pulse lit uniquement vos donn\u00e9es de sant\u00e9, aucune modification n'est effectu\u00e9e."
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "L'application a besoin d'acc\u00e9der \u00e0 votre calendrier pour afficher vos \u00e9v\u00e9nements \u00e0 venir."
+        }
+      ],
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Pulse a besoin d'accéder à votre caméra pour scanner les codes-barres des médicaments.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

@@ -15,7 +15,6 @@ export interface Insight {
 export interface Profile {
   id: string;
   full_name: string | null;
-  health_goal: string | null;
   baseline_hrv: number | null;
   baseline_resting_hr: number | null;
   open_wearables_user_id: string | null;

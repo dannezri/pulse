@@ -1,0 +1,20 @@
+# Directives de Développement et Cohérence du Code
+
+## 1. Priorité à l'Existant (Anti-Duplication)
+- AVANT de générer du code, scanne systématiquement le projet pour identifier des fonctions, classes ou utilitaires existants.
+- Ne recalcule JAMAIS une logique déjà présente. Importe les fonctions depuis les modules existants.
+- Si une logique métier est complexe, recherche d'abord dans les fichiers @Python (backend) ou @TypeScript (frontend/shared).
+
+## 2. Gestion des Tests (Strict)
+- INTERDICTION de créer de nouveaux fichiers de test si un fichier de test pour le module existe déjà.
+- Toute nouvelle fonctionnalité doit faire l'objet d'une MISE À JOUR du fichier de test existant.
+- Les scripts de test temporaires sont proscrits. Utilise les frameworks en place (Pytest pour Python, Jest/Vitest pour TS).
+
+## 3. Standards par Langage
+- **Python :** Respecte la structure du projet. Utilise les `utils` et les modèles existants. Vérifie les schémas @PLpgSQL avant de proposer des requêtes.
+- **TypeScript/MDX :** Réutilise les types et les composants existants. Garde la logique métier séparée de l'affichage.
+- **SQL (PLpgSQL) :** Référence toujours le schéma actuel pour éviter les erreurs de noms de colonnes ou de types.
+
+## 4. Comportement de Modification
+- Préfère toujours la "Modification" (Edit) à la "Création" (Create).
+- Si tu suggères une nouvelle fonction qui ressemble à une ancienne, propose une refactorisation plutôt qu'une duplication.
